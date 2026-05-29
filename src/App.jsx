@@ -1,738 +1,806 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 const GOOGLE_CLIENT_ID = "875796881160-8vjs3un1i373mgm1b39rqle53qv3hmbu.apps.googleusercontent.com";
 const ADMIN_PASSWORD = "ks2admin2025";
 const FOLDER_NAME = "KS2-Mandanten";
 
-// ── Storage ────────────────────────────────────────────────────────
+// ── Storage ──────────────────────────────────────────────────────
 async function loadMandanten() {
   try { const r = localStorage.getItem("mandanten"); return r ? JSON.parse(r) : {}; } catch { return {}; }
 }
-async function saveMandanten(data) { localStorage.setItem("mandanten", JSON.stringify(data)); }
+async function saveMandanten(d) { localStorage.setItem("mandanten", JSON.stringify(d)); }
 async function loadMandantData(id) {
   try { const r = localStorage.getItem(`mandant_${id}`); return r ? JSON.parse(r) : null; } catch { return null; }
 }
-async function saveMandantData(id, data) { localStorage.setItem(`mandant_${id}`, JSON.stringify(data)); }
+async function saveMandantData(id, d) { localStorage.setItem(`mandant_${id}`, JSON.stringify(d)); }
 
-// ── Utils ──────────────────────────────────────────────────────────
-function generateId() { return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
-function generateLink(id) { return `${window.location.origin}${window.location.pathname}?mandant=${id}`; }
-function getMandantIdFromUrl() { return new URLSearchParams(window.location.search).get("mandant"); }
+// ── Utils ────────────────────────────────────────────────────────
+function genId() { return Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
+function genLink(id) { return `${window.location.origin}${window.location.pathname}?mandant=${id}`; }
+function getMandantId() { return new URLSearchParams(window.location.search).get("mandant"); }
+function euros(n) { const v = parseFloat(String(n).replace(/[^0-9.,]/g,"").replace(",",".")); return isNaN(v) ? 0 : v; }
+function fmtEuros(n) { return n === 0 ? "" : n.toLocaleString("de-DE") + " €"; }
 
-// ── Google Drive ───────────────────────────────────────────────────
-function loadGoogleScript() {
-  return new Promise((resolve) => {
-    if (window.google) { resolve(); return; }
+// ── Google Drive ─────────────────────────────────────────────────
+function loadGsi() {
+  return new Promise(res => {
+    if (window.google) { res(); return; }
     const s = document.createElement("script");
     s.src = "https://accounts.google.com/gsi/client";
-    s.onload = resolve;
+    s.onload = res;
     document.head.appendChild(s);
   });
 }
-async function getAccessToken() {
-  await loadGoogleScript();
-  return new Promise((resolve, reject) => {
-    const client = window.google.accounts.oauth2.initTokenClient({
+async function getToken() {
+  await loadGsi();
+  return new Promise((res, rej) => {
+    const c = window.google.accounts.oauth2.initTokenClient({
       client_id: GOOGLE_CLIENT_ID,
       scope: "https://www.googleapis.com/auth/drive.file",
-      callback: (resp) => { if (resp.error) reject(resp.error); else resolve(resp.access_token); },
+      callback: r => r.error ? rej(r.error) : res(r.access_token),
     });
-    client.requestAccessToken();
+    c.requestAccessToken();
   });
 }
-async function ensureFolder(token, folderName, parentId = null) {
-  const query = parentId
-    ? `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`
-    : `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-  const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)`, { headers: { Authorization: `Bearer ${token}` } });
-  const data = await res.json();
-  if (data.files && data.files.length > 0) return data.files[0].id;
-  const meta = { name: folderName, mimeType: "application/vnd.google-apps.folder", ...(parentId ? { parents: [parentId] } : {}) };
-  const createRes = await fetch("https://www.googleapis.com/drive/v3/files", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(meta) });
-  const created = await createRes.json();
-  return created.id;
+async function ensureFolder(tok, name, parentId=null) {
+  const q = parentId
+    ? `name='${name}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`
+    : `name='${name}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+  const r = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)`,{headers:{Authorization:`Bearer ${tok}`}});
+  const d = await r.json();
+  if (d.files?.length) return d.files[0].id;
+  const cr = await fetch("https://www.googleapis.com/drive/v3/files",{method:"POST",headers:{Authorization:`Bearer ${tok}`,"Content-Type":"application/json"},body:JSON.stringify({name,mimeType:"application/vnd.google-apps.folder",...(parentId?{parents:[parentId]}:{})})});
+  return (await cr.json()).id;
 }
-async function uploadFileToDrive(token, file, folderId) {
-  const meta = JSON.stringify({ name: file.name, parents: [folderId] });
+async function uploadFile(tok, file, folderId) {
+  const meta = JSON.stringify({name:file.name,parents:[folderId]});
   const form = new FormData();
-  form.append("metadata", new Blob([meta], { type: "application/json" }));
+  form.append("metadata", new Blob([meta],{type:"application/json"}));
   form.append("file", file);
-  await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: form });
+  await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",{method:"POST",headers:{Authorization:`Bearer ${tok}`},body:form});
 }
-async function uploadTextToDrive(token, filename, content, folderId) {
-  const meta = JSON.stringify({ name: filename, parents: [folderId] });
+async function uploadText(tok, filename, content, folderId) {
+  const meta = JSON.stringify({name:filename,parents:[folderId]});
   const form = new FormData();
-  form.append("metadata", new Blob([meta], { type: "application/json" }));
-  form.append("file", new Blob([content], { type: "text/plain" }));
-  await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: form });
+  form.append("metadata", new Blob([meta],{type:"application/json"}));
+  form.append("file", new Blob([content],{type:"text/plain;charset=utf-8"}));
+  await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",{method:"POST",headers:{Authorization:`Bearer ${tok}`},body:form});
 }
 
-// ── CRM Parser ─────────────────────────────────────────────────────
-function parseCRMText(text) {
-  const get = (label) => {
-    const regex = new RegExp(`${label}\\s+([^\\n]+)`, 'i');
-    const m = text.match(regex);
-    return m ? m[1].trim() : "";
-  };
-  const adresseRaw = get("Adresse");
-  const adresseLines = adresseRaw.split(/\s{2,}|\n/);
+// ── CRM Parser ───────────────────────────────────────────────────
+function parseCRM(text) {
+  const get = (label) => { const m = text.match(new RegExp(`${label}\\s+([^\\n]+)`,"i")); return m?m[1].trim():""; };
+  const adR = get("Adresse"); const aL = adR.split(/\s{2,}/);
   return {
     kundennummer: get("Kunde"),
     vorname: get("Vorname"),
     nachname: get("Nachname"),
     geburtsdatum: get("Geburtsdatum"),
-    adresse: adresseLines[0] || adresseRaw,
-    plz_ort: adresseLines[1] || "",
-    telefon: text.match(/\+49[\s\d]+/)?.[0]?.trim() || "",
-    email: text.match(/[\w.]+@[\w.]+/)?.[0] || "",
+    strasse: aL[0]||adR,
+    plz_ort: aL[1]||"",
+    telefon: text.match(/\+49[\s\d]+/)?.[0]?.trim()||"",
+    email: text.match(/[\w.+-]+@[\w.-]+/)?.[0]||"",
     familienstand: get("Familienstand"),
     staatsangehoerigkeit: get("Staatsangehörigkeit"),
     beruf: get("Ausgeübte Tätigkeit"),
   };
 }
 
-// ── Dokument Kategorien ────────────────────────────────────────────
-const DOKUMENT_KATEGORIEN = [
-  { id: "personalausweis", label: "Personalausweis", sublabel: "Vorder- & Rückseite", required: true },
-  { id: "lohn1", label: "Lohnabrechnung", sublabel: "Letzter Monat", required: true },
-  { id: "lohn2", label: "Lohnabrechnung", sublabel: "Vorletzter Monat", required: true },
-  { id: "lohn3", label: "Lohnabrechnung", sublabel: "Drittletzter Monat", required: true },
-  { id: "eigenkapital", label: "Eigenkapitalnachweis", sublabel: "mind. 30.000 €", required: true },
-  { id: "schufa", label: "SCHUFA-Auskunft", sublabel: "Nicht älter als 3 Monate", required: false },
-  { id: "sonstiges", label: "Sonstige Unterlagen", sublabel: "Optional", required: false },
-];
-
-// ── SA Felder (nur was Mandant ausfüllen muss) ────────────────────
-const SA_SECTIONS = [
-  {
-    title: "Beruf & Beschäftigung",
-    fields: [
-      { key: "berufsstatus", label: "Berufsstatus", type: "select", options: ["Angestellter", "Arbeiter", "Rentner", "öffentlicher Dienst", "Beamter", "arbeitslos", "selbstständig"] },
-      { key: "arbeitszeit", label: "Arbeitszeit", type: "select", options: ["Vollzeit", "Teilzeit"] },
-      { key: "berufsbezeichnung", label: "Berufsbezeichnung", type: "text", placeholder: "z.B. Kaufmann" },
-      { key: "arbeitgeber", label: "Derzeitiger Arbeitgeber", type: "text", placeholder: "Firmenname" },
-      { key: "beschaeftigt_seit", label: "Beschäftigt seit (MM/JJJJ)", type: "text", placeholder: "01/2020" },
-      { key: "arbeitsverhaeltnis", label: "Arbeitsverhältnis", type: "select", options: ["unbefristet", "befristet"] },
-      { key: "probezeit", label: "In Probezeit?", type: "select", options: ["nein", "ja"] },
-      { key: "selbststaendig_seit", label: "Selbstständig tätig seit", type: "text", placeholder: "MM/JJJJ (falls selbstständig)" },
-    ]
-  },
-  {
-    title: "Familie",
-    fields: [
-      { key: "familienstand", label: "Familienstand", type: "select", options: ["ledig", "verheiratet", "geschieden", "verwitwet", "getrennt lebend", "Lebensgemeinschaft"] },
-      { key: "gueterstand", label: "Güterstand", type: "select", options: ["gesetzlicher Güterstand", "Gütertrennung", "Gütergemeinschaft"] },
-      { key: "kinder_anzahl", label: "Anzahl unterhaltsberechtigte Kinder", type: "text", placeholder: "0" },
-      { key: "kind1", label: "Kind 1 (Vorname Name, Geburtsdatum)", type: "text", placeholder: "Max Muster, 01.01.2010" },
-      { key: "kind2", label: "Kind 2", type: "text", placeholder: "" },
-    ]
-  },
-  {
-    title: "Monatliches Einkommen (€)",
-    fields: [
-      { key: "eink_lohn", label: "Lohn/Gehalt netto", type: "text", placeholder: "3.500" },
-      { key: "eink_anzahl_monatsgehaelter", label: "Anzahl Monatsgehälter", type: "text", placeholder: "12" },
-      { key: "eink_partner", label: "Partner (Ehegatte) netto", type: "text", placeholder: "0" },
-      { key: "eink_kindergeld", label: "Gesetzliches Kindergeld", type: "text", placeholder: "0" },
-      { key: "eink_unterhalt_ehegatte", label: "Unterhalt von Ehegatten", type: "text", placeholder: "0" },
-      { key: "eink_unterhalt_kinder", label: "Unterhalt von Kindern", type: "text", placeholder: "0" },
-      { key: "eink_selbststaendig", label: "Aus selbstständiger Tätigkeit", type: "text", placeholder: "0" },
-      { key: "eink_miete", label: "Mieteinnahmen (kalt)", type: "text", placeholder: "0" },
-      { key: "eink_kapital", label: "Kapitaleinkünfte", type: "text", placeholder: "0" },
-      { key: "eink_rente", label: "Renten / Pensionen", type: "text", placeholder: "0" },
-      { key: "eink_sonstige", label: "Sonstige Einnahmen", type: "text", placeholder: "0" },
-    ]
-  },
-  {
-    title: "Monatliche Ausgaben (€)",
-    fields: [
-      { key: "ausg_miete", label: "Miete (entfällt künftig?)", type: "text", placeholder: "850" },
-      { key: "ausg_nebenkosten", label: "Nebenkosten", type: "text", placeholder: "200" },
-      { key: "ausg_versicherungen", label: "LV/RV/Bausparverträge", type: "text", placeholder: "350" },
-      { key: "ausg_darlehen", label: "Darlehen mit Grundpfandrechten", type: "text", placeholder: "0" },
-      { key: "ausg_raten", label: "Sonstige Ratenverpflichtungen", type: "text", placeholder: "0" },
-      { key: "ausg_altersvorsorge", label: "Altersvorsorge (Selbstständige)", type: "text", placeholder: "0" },
-      { key: "ausg_pkv", label: "Private Krankenversicherung", type: "text", placeholder: "677" },
-      { key: "ausg_unterhalt", label: "Unterhaltszahlungen", type: "text", placeholder: "0" },
-      { key: "ausg_sonstige", label: "Sonstige Ausgaben", type: "text", placeholder: "0" },
-    ]
-  },
-  {
-    title: "Rentenansprüche (monatlich, €)",
-    fields: [
-      { key: "rente_gesetzlich", label: "Rentenansprüche gesetzlich", type: "text", placeholder: "0" },
-      { key: "rente_privat", label: "Rentenansprüche aus privaten LV/RV", type: "text", placeholder: "0" },
-    ]
-  },
-  {
-    title: "Vermögen (€)",
-    fields: [
-      { key: "verm_immobilien", label: "Haus- und Grundvermögen (Verkehrswert)", type: "text", placeholder: "0" },
-      { key: "verm_bank", label: "Bank- und Sparguthaben", type: "text", placeholder: "0" },
-      { key: "verm_bank_einsetzen", label: "Davon einsetzen", type: "text", placeholder: "0" },
-      { key: "verm_wertpapiere", label: "Wertpapiere (Kurswert)", type: "text", placeholder: "0" },
-      { key: "verm_bausparer", label: "Bausparvertrag", type: "text", placeholder: "0" },
-      { key: "verm_versicherung", label: "Versicherungsanspruch (Rückkaufswert)", type: "text", placeholder: "0" },
-      { key: "verm_sonstiges", label: "Sonstiges Vermögen", type: "text", placeholder: "0" },
-    ]
-  },
-  {
-    title: "Verbindlichkeiten (€)",
-    fields: [
-      { key: "verb_hypotheken", label: "Hypotheken / Grundschulden (Restschuld)", type: "text", placeholder: "0" },
-      { key: "verb_kredite", label: "Bank- / Privatkredite", type: "text", placeholder: "0" },
-      { key: "verb_sonstige", label: "Sonstige Verbindlichkeiten", type: "text", placeholder: "0" },
-      { key: "verb_buergschaften", label: "Übernommene Bürgschaften", type: "text", placeholder: "0" },
-    ]
-  },
-  {
-    title: "Bankverbindung",
-    fields: [
-      { key: "iban", label: "IBAN", type: "text", placeholder: "DE00 0000 0000 0000 0000 00" },
-      { key: "bic", label: "BIC", type: "text", placeholder: "XXXXXXXX" },
-      { key: "bank_seit", label: "Bankverbindung seit", type: "text", placeholder: "MM/JJJJ" },
-    ]
-  },
-];
-
-// ── CSS ────────────────────────────────────────────────────────────
+// ── CSS ──────────────────────────────────────────────────────────
 const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&display=swap');
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --ink: #0f0e0c; --paper: #f5f2ed; --cream: #ede9e2;
-    --accent: #c8401a; --accent-light: #f0e8e3; --muted: #8a8680;
-    --line: #d4cfc7; --success: #2d6a4f; --success-bg: #e8f4ef; --radius: 2px;
-  }
-  body { background: var(--paper); color: var(--ink); font-family: 'DM Mono', monospace; font-size: 13px; min-height: 100vh; }
-  .app { max-width: 720px; margin: 0 auto; padding: 48px 24px; }
-  .header { margin-bottom: 40px; border-bottom: 1px solid var(--ink); padding-bottom: 20px; }
-  .header-label { font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
-  .header-title { font-family: 'DM Serif Display', serif; font-size: 32px; line-height: 1.1; }
-  .header-title em { font-style: italic; color: var(--accent); }
-  .panel { background: var(--cream); border: 1px solid var(--line); padding: 24px; margin-bottom: 20px; }
-  .section-label { font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
-  .input-row { display: flex; gap: 8px; }
-  .input-field { flex: 1; padding: 10px 14px; border: 1px solid var(--line); background: var(--paper); font-family: 'DM Mono', monospace; font-size: 13px; color: var(--ink); outline: none; border-radius: var(--radius); }
-  .input-field:focus { border-color: var(--ink); }
-  .btn { padding: 10px 20px; border: 1px solid var(--ink); background: var(--ink); color: var(--paper); font-family: 'DM Mono', monospace; font-size: 12px; letter-spacing: 0.05em; cursor: pointer; border-radius: var(--radius); transition: all 0.15s; white-space: nowrap; }
-  .btn:hover { background: var(--accent); border-color: var(--accent); }
-  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-  .btn-outline { background: transparent; color: var(--ink); }
-  .btn-outline:hover { background: var(--ink); color: var(--paper); }
-  .btn-sm { padding: 6px 12px; font-size: 11px; }
-  .btn-danger { border-color: var(--accent); color: var(--accent); background: transparent; }
-  .btn-danger:hover { background: var(--accent); color: var(--paper); }
-  .btn-success { background: var(--success); border-color: var(--success); }
-  .mandant-list { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
-  .mandant-item { display: flex; align-items: flex-start; justify-content: space-between; padding: 14px 16px; background: var(--paper); border: 1px solid var(--line); gap: 12px; flex-wrap: wrap; }
-  .mandant-name { font-weight: 500; font-size: 14px; }
-  .mandant-progress { font-size: 11px; color: var(--muted); margin-top: 2px; }
-  .mandant-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-  .link-display { font-size: 10px; color: var(--muted); word-break: break-all; margin-top: 4px; }
-  .uploads-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 28px; }
-  .upload-item { border: 1px solid var(--line); background: var(--paper); }
-  .upload-item.completed { border-color: var(--success); background: var(--success-bg); }
-  .upload-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; gap: 12px; flex-wrap: wrap; }
-  .upload-label-row { display: flex; align-items: center; gap: 10px; }
-  .upload-status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); flex-shrink: 0; }
-  .upload-item.completed .upload-status-dot { background: var(--success); }
-  .upload-label { font-weight: 500; font-size: 12px; }
-  .upload-sublabel { font-size: 10px; color: var(--muted); margin-top: 1px; }
-  .upload-files-list { padding: 0 16px 10px 34px; display: flex; flex-direction: column; gap: 3px; }
-  .upload-file-item { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--muted); padding: 3px 0; border-top: 1px solid var(--line); }
-  .file-input { display: none; }
-  .sa-section { border: 1px solid var(--line); margin-bottom: 12px; }
-  .sa-section-header { padding: 12px 16px; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; background: var(--cream); cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
-  .sa-section-body { padding: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .form-group { display: flex; flex-direction: column; gap: 4px; }
-  .form-group.full { grid-column: 1/-1; }
-  .form-label { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
-  .form-input { padding: 8px 10px; border: 1px solid var(--line); background: var(--paper); font-family: 'DM Mono', monospace; font-size: 12px; color: var(--ink); outline: none; border-radius: var(--radius); }
-  .form-input:focus { border-color: var(--ink); }
-  .form-input.prefilled { background: #f0f8f0; border-color: var(--success); color: var(--success); }
-  .progress-wrap { margin-bottom: 24px; }
-  .progress-header { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 11px; color: var(--muted); }
-  .progress-bar { height: 3px; background: var(--line); }
-  .progress-fill { height: 100%; background: var(--ink); transition: width 0.4s ease; }
-  .final-section { border: 1px solid var(--ink); padding: 24px; background: var(--cream); }
-  .final-section.disabled { opacity: 0.4; pointer-events: none; }
-  .sign-pad-wrap { border: 1px solid var(--line); background: white; position: relative; margin: 12px 0; }
-  .sign-pad { display: block; cursor: crosshair; touch-action: none; }
-  .sign-label { font-size: 10px; color: var(--muted); padding: 6px 10px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; }
-  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--ink); color: var(--paper); padding: 12px 18px; font-size: 12px; z-index: 999; max-width: 300px; }
-  .divider { height: 1px; background: var(--line); margin: 24px 0; }
-  .badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; padding: 3px 8px; border-radius: 99px; font-weight: 500; }
-  .badge-success { background: var(--success-bg); color: var(--success); }
-  .badge-info { background: var(--accent-light); color: var(--accent); }
-  .crm-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
-  .login-wrap { max-width: 380px; margin: 80px auto; padding: 0 24px; }
-  .admin-tag { font-size: 10px; background: var(--ink); color: var(--paper); padding: 2px 6px; border-radius: 2px; margin-left: 8px; }
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--ink:#0f0e0c;--paper:#f5f2ed;--cream:#ede9e2;--accent:#c8401a;--muted:#8a8680;--line:#d4cfc7;--ok:#2d6a4f;--ok-bg:#e8f4ef;--r:2px}
+body{background:var(--paper);color:var(--ink);font-family:'DM Mono',monospace;font-size:13px;min-height:100vh}
+.app{max-width:640px;margin:0 auto;padding:40px 20px}
+.hdr{margin-bottom:36px;border-bottom:1px solid var(--ink);padding-bottom:18px}
+.hdr-sub{font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.hdr-title{font-family:'DM Serif Display',serif;font-size:28px;line-height:1.1}
+.hdr-title em{font-style:italic;color:var(--accent)}
+.card{background:var(--cream);border:1px solid var(--line);padding:22px;margin-bottom:16px}
+.card.ok{border-color:var(--ok);background:var(--ok-bg)}
+.lbl{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;display:block}
+.row{display:flex;gap:8px;margin-bottom:0}
+.ifield{flex:1;padding:10px 12px;border:1px solid var(--line);background:var(--paper);font-family:'DM Mono',monospace;font-size:13px;color:var(--ink);outline:none;border-radius:var(--r)}
+.ifield:focus{border-color:var(--ink)}
+.ifield.pre{background:#f0f8f0;border-color:var(--ok);color:var(--ok)}
+.btn{padding:10px 20px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);font-family:'DM Mono',monospace;font-size:12px;letter-spacing:.05em;cursor:pointer;border-radius:var(--r);transition:all .15s;white-space:nowrap}
+.btn:hover{background:var(--accent);border-color:var(--accent)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-o{background:transparent;color:var(--ink)}
+.btn-o:hover{background:var(--ink);color:var(--paper)}
+.btn-sm{padding:6px 12px;font-size:11px}
+.btn-del{border-color:var(--accent);color:var(--accent);background:transparent}
+.btn-del:hover{background:var(--accent);color:var(--paper)}
+.btn-ok{background:var(--ok);border-color:var(--ok)}
+.btn-ok:hover{background:#1d4d39;border-color:#1d4d39}
+.upl-item{border:1px solid var(--line);background:var(--paper);margin-bottom:8px}
+.upl-item.ok{border-color:var(--ok);background:var(--ok-bg)}
+.upl-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;gap:10px;flex-wrap:wrap}
+.upl-dot{width:8px;height:8px;border-radius:50%;background:var(--line);flex-shrink:0}
+.upl-item.ok .upl-dot{background:var(--ok)}
+.upl-lbl{font-weight:500;font-size:12px}
+.upl-sub{font-size:10px;color:var(--muted);margin-top:1px}
+.upl-hint{font-size:10px;color:var(--accent);margin-top:2px;font-style:italic}
+.file-list{padding:0 14px 10px 32px;display:flex;flex-direction:column;gap:3px}
+.file-row{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--muted);padding:3px 0;border-top:1px solid var(--line)}
+.file-in{display:none}
+.pg-wrap{margin-bottom:22px}
+.pg-hdr{display:flex;justify-content:space-between;margin-bottom:5px;font-size:11px;color:var(--muted)}
+.pg-bar{height:3px;background:var(--line)}
+.pg-fill{height:100%;background:var(--ink);transition:width .4s}
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;padding:3px 8px;border-radius:99px;font-weight:500}
+.badge-ok{background:var(--ok-bg);color:var(--ok)}
+.badge-info{background:#f0e8e3;color:var(--accent)}
+.divider{height:1px;background:var(--line);margin:20px 0}
+.toast{position:fixed;bottom:20px;right:20px;background:var(--ink);color:var(--paper);padding:12px 16px;font-size:12px;z-index:999;max-width:280px}
+.m-list{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.m-item{border:1px solid var(--line);background:var(--paper)}
+.m-row{display:flex;align-items:flex-start;justify-content:space-between;padding:14px;gap:10px;flex-wrap:wrap}
+.m-acts{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.m-detail{padding:16px;border-top:1px solid var(--line);background:var(--cream)}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fg .lbl{margin-bottom:3px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid2.full{grid-column:1/-1}
+.link-s{font-size:10px;color:var(--muted);word-break:break-all;margin-top:3px}
+.login-w{max-width:340px;margin:80px auto;padding:0 20px}
+.sa-step{max-width:640px;margin:0 auto;padding:40px 20px}
+.sa-q{font-family:'DM Serif Display',serif;font-size:22px;margin-bottom:8px;line-height:1.2}
+.sa-hint{font-size:12px;color:var(--muted);margin-bottom:20px}
+.sa-opts{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.sa-opt{padding:14px 16px;border:1px solid var(--line);background:var(--paper);cursor:pointer;text-align:left;font-family:'DM Mono',monospace;font-size:13px;border-radius:var(--r);transition:all .15s;width:100%}
+.sa-opt:hover,.sa-opt.sel{border-color:var(--ink);background:var(--cream)}
+.sa-opt.sel{font-weight:500}
+.sa-nav{display:flex;justify-content:space-between;margin-top:20px;gap:10px}
+.sa-prog{font-size:11px;color:var(--muted);margin-bottom:20px}
+.sa-num{font-size:28px;font-weight:500;padding:14px 16px;border:1px solid var(--line);background:var(--paper);width:100%;font-family:'DM Mono',monospace;border-radius:var(--r);outline:none}
+.sa-num:focus{border-color:var(--ink)}
+.sum-box{background:var(--cream);border:1px solid var(--line);padding:10px 14px;font-size:12px;margin-top:8px;display:flex;justify-content:space-between}
+.sum-val{font-weight:500;color:var(--ok)}
+.consent-box{border:1px solid var(--line);padding:16px;margin-bottom:16px;background:var(--paper)}
+.consent-row{display:flex;gap:12px;align-items:flex-start;cursor:pointer}
+.consent-row input{margin-top:2px;flex-shrink:0;width:16px;height:16px;cursor:pointer}
+.consent-text{font-size:12px;line-height:1.6}
+.done-screen{text-align:center;padding:60px 20px}
+.done-icon{font-size:48px;margin-bottom:20px}
+.done-title{font-family:'DM Serif Display',serif;font-size:32px;margin-bottom:12px}
+.done-sub{color:var(--muted);font-size:14px;line-height:1.6}
+.sign-wrap{border:1px solid var(--line);background:white}
+.sign-canvas{display:block;cursor:crosshair;touch-action:none;width:100%;max-width:500px}
+.sign-foot{display:flex;justify-content:space-between;padding:8px 12px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);align-items:center}
 `;
 
-// ── Toast ──────────────────────────────────────────────────────────
-function Toast({ msg, onDone }) {
-  useEffect(() => { const t = setTimeout(onDone, 3000); return () => clearTimeout(t); }, []);
+// ── Toast ────────────────────────────────────────────────────────
+function Toast({msg,onDone}) {
+  useEffect(()=>{const t=setTimeout(onDone,3000);return()=>clearTimeout(t)},[]);
   return <div className="toast">{msg}</div>;
 }
 
-// ── Signature Pad ──────────────────────────────────────────────────
-function SignaturePad({ onSave }) {
-  const canvasRef = useRef(null);
+// ── Signature Pad ────────────────────────────────────────────────
+function SigPad({onSave}) {
+  const ref = useRef(null);
   const drawing = useRef(false);
-  const lastPos = useRef(null);
-
-  function getPos(e, canvas) {
-    const rect = canvas.getBoundingClientRect();
-    const src = e.touches ? e.touches[0] : e;
-    return { x: src.clientX - rect.left, y: src.clientY - rect.top };
-  }
-
-  function start(e) {
-    drawing.current = true;
-    lastPos.current = getPos(e, canvasRef.current);
-  }
-  function draw(e) {
-    if (!drawing.current) return;
-    e.preventDefault();
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    const pos = getPos(e, canvas);
-    ctx.beginPath();
-    ctx.moveTo(lastPos.current.x, lastPos.current.y);
-    ctx.lineTo(pos.x, pos.y);
-    ctx.strokeStyle = "#0f0e0c";
-    ctx.lineWidth = 2;
-    ctx.lineCap = "round";
-    ctx.stroke();
-    lastPos.current = pos;
-  }
-  function stop() { drawing.current = false; }
-  function clear() {
-    const canvas = canvasRef.current;
-    canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
-  }
-  function save() { onSave(canvasRef.current.toDataURL()); }
-
+  const last = useRef(null);
+  function pos(e,c) { const r=c.getBoundingClientRect(),s=e.touches?e.touches[0]:e; return {x:(s.clientX-r.left)*(c.width/r.width),y:(s.clientY-r.top)*(c.height/r.height)}; }
+  function start(e){drawing.current=true;last.current=pos(e,ref.current);}
+  function move(e){if(!drawing.current)return;e.preventDefault();const c=ref.current,ctx=c.getContext("2d"),p=pos(e,c);ctx.beginPath();ctx.moveTo(last.current.x,last.current.y);ctx.lineTo(p.x,p.y);ctx.strokeStyle="#0f0e0c";ctx.lineWidth=2;ctx.lineCap="round";ctx.stroke();last.current=p;}
+  function stop(){drawing.current=false;}
+  function clear(){ref.current.getContext("2d").clearRect(0,0,ref.current.width,ref.current.height);}
   return (
-    <div className="sign-pad-wrap">
-      <canvas ref={canvasRef} className="sign-pad" width={500} height={120}
-        onMouseDown={start} onMouseMove={draw} onMouseUp={stop} onMouseLeave={stop}
-        onTouchStart={start} onTouchMove={draw} onTouchEnd={stop} />
-      <div className="sign-label">
-        <span>Hier unterschreiben</span>
-        <span style={{ display: "flex", gap: 8 }}>
-          <button className="btn btn-outline btn-sm" onClick={clear}>Löschen</button>
-          <button className="btn btn-sm" onClick={save}>Unterschrift speichern ✓</button>
+    <div className="sign-wrap">
+      <canvas ref={ref} className="sign-canvas" width={500} height={120}
+        onMouseDown={start} onMouseMove={move} onMouseUp={stop} onMouseLeave={stop}
+        onTouchStart={start} onTouchMove={move} onTouchEnd={stop}/>
+      <div className="sign-foot">
+        <span>Hier mit Finger oder Maus unterschreiben</span>
+        <span style={{display:"flex",gap:6}}>
+          <button className="btn btn-o btn-sm" onClick={clear}>Löschen</button>
+          <button className="btn btn-sm" onClick={()=>onSave(ref.current.toDataURL())}>Speichern ✓</button>
         </span>
       </div>
     </div>
   );
 }
 
-// ── SA Form ────────────────────────────────────────────────────────
-function SelbstauskunftForm({ crmData, existing, onSave, onClose }) {
-  const initial = {};
-  SA_SECTIONS.forEach(s => s.fields.forEach(f => {
-    initial[f.key] = existing?.[f.key] ?? crmData?.[f.key] ?? "";
-  }));
-  // Pre-fill from CRM
-  if (crmData) {
-    if (!initial.familienstand && crmData.familienstand) initial.familienstand = crmData.familienstand;
-    if (!initial.iban && crmData.iban) initial.iban = crmData.iban;
-    if (!initial.bic && crmData.bic) initial.bic = crmData.bic;
+// ── SA Wizard ────────────────────────────────────────────────────
+function SAWizard({crmData, adminData, existing, onSave, onClose}) {
+  const initVals = existing || {};
+  const [vals, setVals] = useState(initVals);
+  const [step, setStep] = useState(0);
+  const [sig, setSig] = useState(existing?.signature||null);
+  const set = (k,v) => setVals(p=>({...p,[k]:v}));
+
+  // Build steps dynamically
+  const steps = [];
+
+  // Step: Berufsstatus
+  steps.push({
+    id:"berufsstatus", type:"choice",
+    q:"Wie bist du aktuell beschäftigt?",
+    opts:["Angestellter","Arbeiter","Beamter","öffentlicher Dienst","selbstständig","Rentner","arbeitslos"],
+    key:"berufsstatus",
+  });
+
+  // Step: Berufsbezeichnung + Arbeitgeber (nur wenn nicht selbstständig/rentner/arbeitslos)
+  if (!["selbstständig","Rentner","arbeitslos"].includes(vals.berufsstatus)) {
+    steps.push({id:"beruf_detail",type:"multi",q:"Dein Beruf",fields:[
+      {key:"berufsbezeichnung",label:"Berufsbezeichnung",placeholder:"z.B. Kaufmann/frau"},
+      {key:"arbeitgeber",label:"Arbeitgeber",placeholder:"Firmenname"},
+      {key:"beschaeftigt_seit",label:"Beschäftigt seit (MM/JJJJ)",placeholder:"01/2020"},
+    ]});
+    steps.push({id:"arbeitszeit",type:"choice",q:"Wie arbeitest du?",opts:["Vollzeit","Teilzeit"],key:"arbeitszeit"});
+    steps.push({id:"arbeitsverhaeltnis",type:"choice",q:"Art des Arbeitsverhältnisses?",opts:["unbefristet","befristet"],key:"arbeitsverhaeltnis"});
+    if (vals.arbeitsverhaeltnis==="befristet") {
+      steps.push({id:"befristet_bis",type:"text",q:"Befristung läuft aus am:",key:"befristet_bis",placeholder:"MM/JJJJ",hint:"Bitte Datum eintragen"});
+    }
+    steps.push({id:"probezeit",type:"choice",q:"Bist du aktuell in der Probezeit?",opts:["Nein","Ja"],key:"probezeit"});
+    if (vals.probezeit==="Ja") {
+      steps.push({id:"probezeit_bis",type:"text",q:"Probezeit endet am:",key:"probezeit_bis",placeholder:"MM/JJJJ"});
+    }
+  }
+  if (vals.berufsstatus==="selbstständig") {
+    steps.push({id:"selbst_seit",type:"text",q:"Selbstständig tätig seit:",key:"selbststaendig_seit",placeholder:"MM/JJJJ"});
   }
 
-  const [vals, setVals] = useState(initial);
-  const [open, setOpen] = useState({ 0: true });
-  const [sig, setSig] = useState(existing?.signature || null);
-  const set = (k, v) => setVals(p => ({ ...p, [k]: v }));
-  const crmKeys = Object.keys(crmData || {});
+  // Familie
+  steps.push({id:"familienstand",type:"choice",q:"Familienstand?",opts:["ledig","verheiratet","Lebensgemeinschaft","geschieden","verwitwet","getrennt lebend"],key:"familienstand"});
+  if (["verheiratet","Lebensgemeinschaft"].includes(vals.familienstand)) {
+    steps.push({id:"gueterstand",type:"choice",q:"Güterstand?",opts:["gesetzlicher Güterstand","Gütertrennung","Gütergemeinschaft"],key:"gueterstand"});
+  }
+  steps.push({id:"kinder_anzahl",type:"choice",q:"Anzahl unterhaltsberechtigte Kinder?",opts:["0","1","2","3","4","5+"],key:"kinder_anzahl"});
+  const nKids = parseInt(vals.kinder_anzahl||"0");
+  for (let i=1;i<=Math.min(nKids,5);i++) {
+    steps.push({id:`kind_${i}`,type:"multi",q:`Kind ${i}`,fields:[
+      {key:`kind${i}_vorname`,label:"Vorname",placeholder:"Vorname"},
+      {key:`kind${i}_name`,label:"Nachname",placeholder:"Nachname"},
+      {key:`kind${i}_geb`,label:"Geburtsdatum",placeholder:"TT.MM.JJJJ"},
+    ]});
+  }
+
+  // Einkommen
+  const einkFields = [
+    {key:"eink_lohn",label:"Lohn/Gehalt netto (monatlich)",placeholder:"3.500"},
+    {key:"eink_anzahl_mg",label:"Anzahl Monatsgehälter pro Jahr",placeholder:"12"},
+  ];
+  if (parseInt(vals.kinder_anzahl||"0")>0) einkFields.push({key:"eink_kindergeld",label:"Gesetzl. Kindergeld (alle Kinder gesamt)",placeholder:"250"});
+  einkFields.push(
+    {key:"eink_unterhalt_k",label:"Unterhalt Kinder (eingehend, gesamt)",placeholder:"0"},
+    {key:"eink_kapital",label:"Kapitaleinkünfte (Depot, Zinsen etc.)",placeholder:"0"},
+    {key:"eink_selbst",label:"Einkünfte aus Selbstständigkeit",placeholder:"0"},
+    {key:"eink_miete",label:"Mieteinnahmen (kalt)",placeholder:"0"},
+    {key:"eink_rente",label:"Renten (BU, gesetzl., Pension etc.)",placeholder:"0"},
+    {key:"eink_sonstige",label:"Sonstige Einnahmen",placeholder:"0"},
+  );
+  steps.push({id:"einkommen",type:"sumFields",q:"Monatliches Nettoeinkommen",hint:"Alle Angaben in € pro Monat",fields:einkFields,sumKeys:["eink_lohn","eink_kindergeld","eink_unterhalt_k","eink_kapital","eink_selbst","eink_miete","eink_rente","eink_sonstige"]});
+
+  // Ausgaben
+  steps.push({id:"ausgaben",type:"sumFields",q:"Monatliche Ausgaben",hint:"Alle Angaben in € pro Monat",fields:[
+    {key:"ausg_miete",label:"Miete (entfällt bei Kauf)",placeholder:"850"},
+    {key:"ausg_nk",label:"Nebenkosten",placeholder:"200"},
+    {key:"ausg_vers",label:"Versicherungen / Bauspar / Riester",placeholder:"350"},
+    {key:"ausg_pkv",label:"Private Krankenversicherung",placeholder:"0"},
+    {key:"ausg_darlehen",label:"Bestehende Darlehen (monatl. Rate)",placeholder:"0"},
+    {key:"ausg_raten",label:"Sonstige Ratenverpflichtungen",placeholder:"0"},
+    {key:"ausg_unterhalt",label:"Unterhaltszahlungen (ausgehend)",placeholder:"0"},
+    {key:"ausg_altersvorsorge",label:"Altersvorsorge (Selbstständige)",placeholder:"0"},
+    {key:"ausg_sonstige",label:"Sonstige Ausgaben",placeholder:"0"},
+  ],sumKeys:["ausg_miete","ausg_nk","ausg_vers","ausg_pkv","ausg_darlehen","ausg_raten","ausg_unterhalt","ausg_altersvorsorge","ausg_sonstige"]});
+
+  // Rente
+  steps.push({id:"rente",type:"sumFields",q:"Rentenansprüche (Schätzung)",hint:"Ungefähre monatliche Beträge – grobe Schätzung reicht",fields:[
+    {key:"rente_gesetzlich",label:"Gesetzliche Rente (ca.)",placeholder:"800"},
+    {key:"rente_privat",label:"Private Renten / LV-Auszahlung (ca.)",placeholder:"0"},
+  ],sumKeys:["rente_gesetzlich","rente_privat"]});
+
+  // Vermögen
+  steps.push({id:"vermoegen",type:"sumFields",q:"Vorhandenes Vermögen",hint:"Aktuelle Werte in €",fields:[
+    {key:"verm_immobilien",label:"Immobilien (Verkehrswert)",placeholder:"0"},
+    {key:"verm_bank",label:"Bank- & Sparguthaben",placeholder:"0"},
+    {key:"verm_wertpapiere",label:"Wertpapiere / Depot (Kurswert)",placeholder:"0"},
+    {key:"verm_bausparer",label:"Bausparvertrag",placeholder:"0"},
+    {key:"verm_versicherung",label:"Lebensversicherung (Rückkaufswert)",placeholder:"0"},
+    {key:"verm_sonstiges",label:"Sonstiges Vermögen",placeholder:"0"},
+  ],sumKeys:["verm_immobilien","verm_bank","verm_wertpapiere","verm_bausparer","verm_versicherung","verm_sonstiges"]});
+
+  // Einsetzbares Kapital
+  steps.push({id:"einsetzbar",type:"text",q:"Wie viel Kapital könntest du einsetzen?",hint:"Einsetzbares Kapital = der Betrag, den du tatsächlich für den Immobilienkauf verfügbar machen könntest (Eigenkapital, das du bereit bist einzusetzen).",key:"einsetzbar",placeholder:"30.000"});
+
+  // Verbindlichkeiten
+  steps.push({id:"verbindlichkeiten",type:"sumFields",q:"Bestehende Verbindlichkeiten",hint:"Aktuelle Restschulden in €",fields:[
+    {key:"verb_hypotheken",label:"Hypotheken / Grundschulden",placeholder:"0"},
+    {key:"verb_kredite",label:"Bank- / Privatkredite",placeholder:"0"},
+    {key:"verb_sonstige",label:"Sonstige Verbindlichkeiten",placeholder:"0"},
+    {key:"verb_buergschaften",label:"Übernommene Bürgschaften",placeholder:"0"},
+  ],sumKeys:["verb_hypotheken","verb_kredite","verb_sonstige","verb_buergschaften"]});
+
+  // Unterschrift
+  steps.push({id:"unterschrift",type:"signature",q:"Unterschrift",hint:"Bitte unterschreibe hier zur Bestätigung deiner Angaben."});
+
+  const cur = steps[step] || steps[steps.length-1];
+  const total = steps.length;
+
+  function next() { if (step < total-1) setStep(s=>s+1); }
+  function back() { if (step > 0) setStep(s=>s-1); }
+
+  function canNext() {
+    if (!cur) return false;
+    if (cur.type==="choice") return !!vals[cur.key];
+    if (cur.type==="text") return !!(vals[cur.key]||"").trim();
+    if (cur.type==="multi") return cur.fields.every(f=>!!(vals[f.key]||"").trim());
+    if (cur.type==="sumFields") return true; // optional fields ok
+    if (cur.type==="signature") return !!sig;
+    return true;
+  }
+
+  function computeSum(keys) {
+    return keys.reduce((a,k)=>a+euros(vals[k]||"0"),0);
+  }
+
+  function handleSave() {
+    onSave({...vals, signature: sig});
+  }
+
+  const isLast = step === total-1;
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(15,14,12,0.75)", overflowY: "auto", zIndex: 100, padding: "24px" }}>
-      <div style={{ background: "var(--paper)", maxWidth: 640, margin: "0 auto", border: "1px solid var(--ink)", padding: 32 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
-          <div>
-            <div className="header-label">Dokument</div>
-            <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 22 }}>Selbstauskunft</div>
-            {crmData && <div className="badge badge-success" style={{ marginTop: 6 }}>✓ CRM-Daten vorausgefüllt</div>}
-          </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "var(--muted)" }}>×</button>
+    <div style={{position:"fixed",inset:0,background:"rgba(15,14,12,0.8)",overflowY:"auto",zIndex:100,padding:"20px"}}>
+      <div style={{background:"var(--paper)",maxWidth:560,margin:"0 auto",border:"1px solid var(--ink)",padding:"28px 24px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <div className="sa-prog">Schritt {step+1} von {total}</div>
+          <button onClick={onClose} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:"var(--muted)"}}>×</button>
         </div>
+        <div className="pg-bar" style={{marginBottom:24}}><div className="pg-fill" style={{width:`${((step+1)/total)*100}%`}}/></div>
 
-        {SA_SECTIONS.map((section, si) => (
-          <div key={si} className="sa-section">
-            <div className="sa-section-header" onClick={() => setOpen(p => ({ ...p, [si]: !p[si] }))}>
-              <span>{section.title}</span>
-              <span>{open[si] ? "▲" : "▼"}</span>
+        {cur.type==="choice" && (
+          <div>
+            <div className="sa-q">{cur.q}</div>
+            <div className="sa-opts">
+              {cur.opts.map(o=>(
+                <button key={o} className={`sa-opt${vals[cur.key]===o?" sel":""}`} onClick={()=>{set(cur.key,o);setTimeout(next,200);}}>
+                  {o}
+                </button>
+              ))}
             </div>
-            {open[si] && (
-              <div className="sa-section-body">
-                {section.fields.map(f => (
-                  <div key={f.key} className="form-group">
-                    <label className="form-label">{f.label}</label>
-                    {f.type === "select" ? (
-                      <select className="form-input" value={vals[f.key]} onChange={e => set(f.key, e.target.value)}>
-                        <option value="">– wählen –</option>
-                        {f.options.map(o => <option key={o} value={o}>{o}</option>)}
-                      </select>
-                    ) : (
-                      <input className={`form-input${crmKeys.includes(f.key) && vals[f.key] ? " prefilled" : ""}`}
-                        value={vals[f.key]} onChange={e => set(f.key, e.target.value)} placeholder={f.placeholder} />
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
-        ))}
+        )}
 
-        <div className="divider" />
-        <div className="section-label">Unterschrift des Kunden</div>
-        {sig
-          ? <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-              <img src={sig} alt="Unterschrift" style={{ border: "1px solid var(--line)", maxWidth: 240 }} />
-              <button className="btn btn-outline btn-sm" onClick={() => setSig(null)}>Neu unterschreiben</button>
+        {cur.type==="text" && (
+          <div>
+            <div className="sa-q">{cur.q}</div>
+            {cur.hint && <div className="sa-hint">{cur.hint}</div>}
+            <input className="sa-num" value={vals[cur.key]||""} onChange={e=>set(cur.key,e.target.value)} placeholder={cur.placeholder||""} autoFocus />
+          </div>
+        )}
+
+        {cur.type==="multi" && (
+          <div>
+            <div className="sa-q">{cur.q}</div>
+            {cur.fields.map(f=>(
+              <div key={f.key} style={{marginBottom:12}}>
+                <div className="lbl">{f.label}</div>
+                <input className="ifield" style={{width:"100%"}} value={vals[f.key]||""} onChange={e=>set(f.key,e.target.value)} placeholder={f.placeholder||""}/>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {cur.type==="sumFields" && (
+          <div>
+            <div className="sa-q">{cur.q}</div>
+            {cur.hint && <div className="sa-hint">{cur.hint}</div>}
+            {cur.fields.map(f=>(
+              <div key={f.key} style={{marginBottom:10}}>
+                <div className="lbl">{f.label}</div>
+                <input className="ifield" style={{width:"100%"}} value={vals[f.key]||""} onChange={e=>set(f.key,e.target.value)} placeholder={f.placeholder||"0"} type="text" inputMode="decimal"/>
+              </div>
+            ))}
+            <div className="sum-box">
+              <span>Gesamt</span>
+              <span className="sum-val">{fmtEuros(computeSum(cur.sumKeys))}</span>
             </div>
-          : <SignaturePad onSave={setSig} />
-        }
+          </div>
+        )}
 
-        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
-          <button className="btn btn-outline btn-sm" onClick={onClose}>Abbrechen</button>
-          <button className="btn btn-sm" onClick={() => onSave({ ...vals, signature: sig })}>Speichern ✓</button>
+        {cur.type==="signature" && (
+          <div>
+            <div className="sa-q">{cur.q}</div>
+            <div className="sa-hint">{cur.hint}</div>
+            {sig
+              ? <div style={{marginBottom:12}}>
+                  <img src={sig} alt="Unterschrift" style={{maxWidth:280,border:"1px solid var(--line)"}}/>
+                  <br/><button className="btn btn-o btn-sm" style={{marginTop:8}} onClick={()=>setSig(null)}>Neu unterschreiben</button>
+                </div>
+              : <SigPad onSave={setSig}/>
+            }
+          </div>
+        )}
+
+        <div className="sa-nav">
+          <button className="btn btn-o btn-sm" onClick={back} disabled={step===0}>← Zurück</button>
+          {isLast
+            ? <button className="btn btn-sm" disabled={!canNext()} onClick={handleSave}>Speichern ✓</button>
+            : <button className="btn btn-sm" disabled={!canNext()} onClick={next}>Weiter →</button>
+          }
         </div>
       </div>
     </div>
   );
 }
 
-// ── Mandant Page ───────────────────────────────────────────────────
-function MandantPage({ mandantId }) {
+// ── Dokument Kategorien (Mandantenseite) ─────────────────────────
+const DOCS = [
+  { id:"eigenkapital", label:"Eigenkapitalnachweis", sublabel:"Kontoauszug oder Depotauszug", hint:"Wichtig: Name, Datum und Vermögensbetrag in € müssen auf der gleichen Seite erkennbar sein.", required:true },
+  { id:"steuerbescheid", label:"Steuerbescheid", sublabel:"Aktuellster vorliegender Bescheid", hint:null, required:true, noDoc:true, noDocLabel:"Ich habe keinen Steuerbescheid (keine Steuererklärung abgegeben)" },
+  { id:"lohn1", label:"Gehaltsnachweis", sublabel:"Letzter vollständiger Monat", hint:"Foto direkt mit der Kamera möglich.", required:true, camera:true },
+  { id:"lohn2", label:"Gehaltsnachweis", sublabel:"Vorletzter vollständiger Monat", hint:null, required:true, camera:true },
+  { id:"lohn3", label:"Gehaltsnachweis", sublabel:"Drittletzter vollständiger Monat", hint:null, required:true, camera:true },
+];
+
+// ── Mandant Page ─────────────────────────────────────────────────
+function MandantPage({mandantId}) {
   const [data, setData] = useState(null);
   const [showSA, setShowSA] = useState(false);
+  const [consent, setConsent] = useState(false);
   const [toast, setToast] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [done, setDone] = useState(false);
 
-  useEffect(() => { loadMandantData(mandantId).then(d => { if (d) setData(d); }); }, [mandantId]);
+  useEffect(()=>{ loadMandantData(mandantId).then(d=>{ if(d) setData(d); }); },[mandantId]);
 
-  if (!data) return <div className="app"><style>{CSS}</style><div style={{ color: "var(--muted)", paddingTop: 48 }}>Lade…</div></div>;
+  if (!data) return <div className="app"><style>{CSS}</style><div style={{color:"var(--muted)",paddingTop:48}}>Lade…</div></div>;
 
-  const { vorname, nachname, uploads = {}, selbstauskunft = null, crmData = null } = data;
+  const {vorname,nachname,uploads={},selbstauskunft=null,crmData=null,adminData={}} = data;
   const fullName = `${vorname} ${nachname}`;
-  const reqDocs = DOKUMENT_KATEGORIEN.filter(d => d.required);
-  const doneReq = reqDocs.filter(d => (uploads[d.id]?.length ?? 0) > 0).length;
-  const totalSteps = reqDocs.length + 1;
-  const doneSteps = doneReq + (selbstauskunft ? 1 : 0);
-  const pct = Math.round((doneSteps / totalSteps) * 100);
-  const allDone = doneSteps === totalSteps;
+
+  const reqDocs = DOCS.filter(d=>d.required);
+  const doneReq = reqDocs.filter(d=>(uploads[d.id]?.length??0)>0 || uploads[`${d.id}_nodoc`]).length;
+  const totalSteps = reqDocs.length + 1; // +SA
+  const doneSteps = doneReq + (selbstauskunft?1:0);
+  const pct = Math.round((doneSteps/totalSteps)*100);
+  const allDone = doneSteps===totalSteps && consent;
 
   async function handleUpload(docId, files) {
-    const fileList = Array.from(files).map(f => ({ name: f.name, date: new Date().toLocaleDateString("de-DE"), _file: f }));
-    const newUploads = { ...uploads, [docId]: [...(uploads[docId] ?? []), ...fileList] };
-    const newData = { ...data, uploads: newUploads };
-    setData(newData);
-    await saveMandantData(mandantId, newData);
-    setToast(`${fileList.length} Datei(en) gespeichert`);
+    const fl = Array.from(files).map(f=>({name:f.name,date:new Date().toLocaleDateString("de-DE"),_file:f}));
+    const newU = {...uploads,[docId]:[...(uploads[docId]??[]),...fl]};
+    const nd = {...data,uploads:newU};
+    setData(nd); await saveMandantData(mandantId,nd);
+    setToast(`${fl.length} Datei(en) gespeichert`);
   }
 
-  async function handleRemoveFile(docId, idx) {
-    const newList = uploads[docId].filter((_, i) => i !== idx);
-    const newData = { ...data, uploads: { ...uploads, [docId]: newList } };
-    setData(newData);
-    await saveMandantData(mandantId, newData);
+  async function handleNoDoc(docId) {
+    const newU = {...uploads,[`${docId}_nodoc`]:true};
+    const nd = {...data,uploads:newU};
+    setData(nd); await saveMandantData(mandantId,nd);
+    setToast("Bestätigt ✓");
+  }
+
+  async function handleRemove(docId, idx) {
+    const nl = uploads[docId].filter((_,i)=>i!==idx);
+    const nd = {...data,uploads:{...uploads,[docId]:nl}};
+    setData(nd); await saveMandantData(mandantId,nd);
+  }
+
+  async function handleUndoNoDoc(docId) {
+    const newU = {...uploads};
+    delete newU[`${docId}_nodoc`];
+    const nd = {...data,uploads:newU};
+    setData(nd); await saveMandantData(mandantId,nd);
   }
 
   async function handleSaveSA(vals) {
-    const newData = { ...data, selbstauskunft: vals };
-    setData(newData);
-    await saveMandantData(mandantId, newData);
-    setShowSA(false);
-    setToast("Selbstauskunft gespeichert ✓");
+    const nd = {...data,selbstauskunft:vals};
+    setData(nd); await saveMandantData(mandantId,nd);
+    setShowSA(false); setToast("Selbstauskunft gespeichert ✓");
   }
 
-  async function handleSyncDrive() {
+  async function handleSubmit() {
     setUploading(true);
     try {
-      const token = await getAccessToken();
-      const rootId = await ensureFolder(token, FOLDER_NAME);
-      const folderId = await ensureFolder(token, fullName, rootId);
-      for (const [, files] of Object.entries(uploads)) {
-        for (const file of files) {
-          if (file._file) await uploadFileToDrive(token, file._file, folderId);
-        }
+      const tok = await getToken();
+      const rootId = await ensureFolder(tok, FOLDER_NAME);
+      const fId = await ensureFolder(tok, fullName, rootId);
+      for (const [,files] of Object.entries(uploads)) {
+        if (!Array.isArray(files)) continue;
+        for (const f of files) { if(f._file) await uploadFile(tok,f._file,fId); }
       }
       if (selbstauskunft) {
-        const saText = Object.entries(selbstauskunft).map(([k, v]) => `${k}: ${v}`).join("\n");
-        await uploadTextToDrive(token, `Selbstauskunft_${fullName}.txt`, saText, folderId);
+        const txt = Object.entries(selbstauskunft).map(([k,v])=>`${k}: ${v}`).join("\n");
+        await uploadText(tok,`Selbstauskunft_${fullName}.txt`,txt,fId);
       }
-      setToast(`✓ In Google Drive gespeichert`);
-    } catch (e) {
+      setDone(true);
+    } catch(e) {
       setToast("Fehler – bitte erneut versuchen");
     }
     setUploading(false);
   }
 
+  if (done) return (
+    <div className="app"><style>{CSS}</style>
+      <div className="done-screen">
+        <div className="done-icon">✅</div>
+        <div className="done-title">Vielen Dank!</div>
+        <div className="done-sub">Ihre Unterlagen wurden erfolgreich eingereicht.<br/>Wir melden uns schnellstmöglich bei Ihnen.</div>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="app">
-      <style>{CSS}</style>
-      <div className="header">
-        <div className="header-label">Meine Unterlagen für den Einwertungsprozess</div>
-        <div className="header-title"><em>{fullName}</em></div>
-        {crmData && <div className="badge badge-success" style={{ marginTop: 8 }}>✓ Ihre Daten wurden vorausgefüllt</div>}
+    <div className="app"><style>{CSS}</style>
+      <div className="hdr">
+        <div className="hdr-sub">Meine Unterlagen für den Einwertungsprozess</div>
+        <div className="hdr-title"><em>{fullName}</em></div>
       </div>
 
-      <div className="progress-wrap">
-        <div className="progress-header"><span>Fortschritt</span><span>{doneSteps} / {totalSteps}</span></div>
-        <div className="progress-bar"><div className="progress-fill" style={{ width: `${pct}%` }} /></div>
+      <div className="pg-wrap">
+        <div className="pg-hdr"><span>Fortschritt</span><span>{doneSteps} / {totalSteps}</span></div>
+        <div className="pg-bar"><div className="pg-fill" style={{width:`${pct}%`}}/></div>
       </div>
 
-      <div className="section-label">Unterlagen hochladen</div>
-      <div className="uploads-grid">
-        {DOKUMENT_KATEGORIEN.map(dok => {
-          const files = uploads[dok.id] ?? [];
-          const done = files.length > 0;
-          return (
-            <div key={dok.id} className={`upload-item${done ? " completed" : ""}`}>
-              <div className="upload-header">
-                <div className="upload-label-row">
-                  <div className="upload-status-dot" />
-                  <div>
-                    <div className="upload-label">{dok.label}{dok.required && <span style={{ color: "var(--accent)", marginLeft: 4 }}>*</span>}</div>
-                    <div className="upload-sublabel">{dok.sublabel}</div>
-                  </div>
-                </div>
-                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                  {done && <span className="badge badge-success">✓ {files.length}</span>}
-                  <label className="btn btn-outline btn-sm" style={{ cursor: "pointer" }}>
-                    Hochladen
-                    <input type="file" className="file-input" multiple accept="image/*,application/pdf" capture="environment" onChange={e => handleUpload(dok.id, e.target.files)} />
-                  </label>
+      <span className="lbl">Unterlagen hochladen</span>
+      {DOCS.map(dok=>{
+        const files = uploads[dok.id]??[];
+        const noDoc = !!uploads[`${dok.id}_nodoc`];
+        const ok = files.length>0||noDoc;
+        return (
+          <div key={dok.id} className={`upl-item${ok?" ok":""}`}>
+            <div className="upl-hdr">
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <div className="upl-dot"/>
+                <div>
+                  <div className="upl-lbl">{dok.label}{dok.required&&<span style={{color:"var(--accent)",marginLeft:4}}>*</span>}</div>
+                  <div className="upl-sub">{dok.sublabel}</div>
+                  {dok.hint&&!ok&&<div className="upl-hint">ℹ {dok.hint}</div>}
                 </div>
               </div>
-              {files.length > 0 && (
-                <div className="upload-files-list">
-                  {files.map((f, i) => (
-                    <div key={i} className="upload-file-item">
-                      <span>📄 {f.name}</span>
-                      <button className="btn btn-danger btn-sm" onClick={() => handleRemoveFile(dok.id, i)}>×</button>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                {ok&&<span className="badge badge-ok">✓</span>}
+                {!noDoc&&(
+                  <label className="btn btn-o btn-sm" style={{cursor:"pointer"}}>
+                    {dok.camera?"📷 Foto/Upload":"Hochladen"}
+                    <input type="file" className="file-in" multiple accept="image/*,application/pdf" capture={dok.camera?"environment":undefined} onChange={e=>handleUpload(dok.id,e.target.files)}/>
+                  </label>
+                )}
+              </div>
             </div>
-          );
-        })}
-      </div>
+            {dok.noDoc&&!noDoc&&files.length===0&&(
+              <div style={{padding:"0 14px 12px 32px"}}>
+                <button className="btn btn-o btn-sm" onClick={()=>handleNoDoc(dok.id)}>☐ {dok.noDocLabel}</button>
+              </div>
+            )}
+            {noDoc&&(
+              <div style={{padding:"0 14px 12px 32px",display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:11,color:"var(--ok)"}}>☑ {dok.noDocLabel}</span>
+                <button className="btn btn-del btn-sm" onClick={()=>handleUndoNoDoc(dok.id)}>Rückgängig</button>
+              </div>
+            )}
+            {files.length>0&&(
+              <div className="file-list">
+                {files.map((f,i)=>(
+                  <div key={i} className="file-row">
+                    <span>📄 {f.name}</span>
+                    <button className="btn btn-del btn-sm" onClick={()=>handleRemove(dok.id,i)}>Entfernen</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
 
-      <div className="divider" />
+      <div className="divider"/>
 
-      <div className={`panel${selbstauskunft ? "" : ""}`} style={{ borderColor: selbstauskunft ? "var(--success)" : "var(--line)", background: selbstauskunft ? "var(--success-bg)" : "var(--cream)" }}>
-        <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, marginBottom: 4 }}>Selbstauskunft</div>
-        <div style={{ color: "var(--muted)", fontSize: 11, marginBottom: 16 }}>
-          {selbstauskunft ? "Ausgefüllt und gespeichert." : "Bitte alle relevanten Felder ausfüllen."}
-          {crmData && !selbstauskunft && " Ihre bekannten Daten sind bereits vorausgefüllt."}
+      <div className={`card${selbstauskunft?" ok":""}`}>
+        <div style={{fontFamily:"'DM Serif Display',serif",fontSize:20,marginBottom:4}}>Selbstauskunft</div>
+        <div style={{color:"var(--muted)",fontSize:11,marginBottom:14}}>
+          {selbstauskunft?"Ausgefüllt und gespeichert.":"Bitte alle Angaben zu Beruf, Einkommen und Vermögen machen."}
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {selbstauskunft && <span className="badge badge-success">✓ Ausgefüllt</span>}
-          {selbstauskunft?.signature && <span className="badge badge-success">✓ Unterschrift</span>}
-          <button className="btn btn-outline btn-sm" onClick={() => setShowSA(true)}>
-            {selbstauskunft ? "Bearbeiten" : "Ausfüllen →"}
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          {selbstauskunft&&<span className="badge badge-ok">✓</span>}
+          <button className="btn btn-o btn-sm" onClick={()=>setShowSA(true)}>
+            {selbstauskunft?"Bearbeiten":"Ausfüllen →"}
           </button>
         </div>
       </div>
 
-      <div className="divider" />
+      <div className="divider"/>
 
-      <div className={`final-section${!allDone ? " disabled" : ""}`}>
-        <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 18, marginBottom: 8 }}>Unterlagen einreichen</div>
-        <div style={{ color: "var(--muted)", fontSize: 11, marginBottom: 16 }}>
-          {allDone ? "Alle Unterlagen vollständig. Jetzt in Google Drive hochladen." : "Bitte erst alle Pflichtfelder ausfüllen."}
-        </div>
-        <button className="btn btn-success" onClick={handleSyncDrive} disabled={uploading}>
-          {uploading ? "Lädt hoch…" : "→ Google Drive speichern"}
-        </button>
+      <div className="consent-box">
+        <label className="consent-row">
+          <input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)}/>
+          <span className="consent-text">
+            <strong>Einwilligung zur Datenverarbeitung *</strong><br/>
+            Ich willige ein, dass meine personenbezogenen Daten ausschließlich zum Zweck der Immobilien-Einwertung und Finanzierungsvermittlung verarbeitet werden. Die Daten werden streng vertraulich behandelt, nicht an Dritte weitergegeben und nach Abschluss des Prozesses nach den gesetzlichen Aufbewahrungsfristen gelöscht. Grundlage ist Art. 6 Abs. 1 a) DS-GVO.
+          </span>
+        </label>
       </div>
 
-      {showSA && <SelbstauskunftForm crmData={crmData} existing={selbstauskunft} onSave={handleSaveSA} onClose={() => setShowSA(false)} />}
-      {toast && <Toast msg={toast} onDone={() => setToast(null)} />}
+      <button className="btn btn-ok" style={{width:"100%",padding:"14px",fontSize:14}} onClick={handleSubmit} disabled={!allDone||uploading}>
+        {uploading?"Wird eingereicht…":"Unterlagen einreichen →"}
+      </button>
+      {!allDone&&<div style={{fontSize:11,color:"var(--muted)",textAlign:"center",marginTop:8}}>
+        {!consent?"Bitte Datenschutzerklärung bestätigen":"Bitte alle Pflichtfelder ausfüllen"}
+      </div>}
+
+      {showSA&&<SAWizard crmData={crmData} adminData={adminData} existing={selbstauskunft} onSave={handleSaveSA} onClose={()=>setShowSA(false)}/>}
+      {toast&&<Toast msg={toast} onDone={()=>setToast(null)}/>}
     </div>
   );
 }
 
-// ── Admin Login ────────────────────────────────────────────────────
-function AdminLogin({ onLogin }) {
-  const [pw, setPw] = useState("");
-  const [err, setErr] = useState(false);
-  function check() {
-    if (pw === ADMIN_PASSWORD) { sessionStorage.setItem("ks2admin", "1"); onLogin(); }
-    else { setErr(true); setTimeout(() => setErr(false), 2000); }
-  }
-  return (
-    <div className="app">
-      <style>{CSS}</style>
-      <div className="login-wrap">
-        <div className="header-label">KS2 · Immobilien</div>
-        <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 28, marginBottom: 24 }}>Admin<br /><em style={{ fontStyle: "italic", color: "var(--accent)" }}>Zugang</em></div>
-        <input className="input-field" type="password" placeholder="Passwort" value={pw}
-          onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === "Enter" && check()}
-          style={{ width: "100%", marginBottom: 8, borderColor: err ? "var(--accent)" : undefined }} />
-        {err && <div style={{ color: "var(--accent)", fontSize: 11, marginBottom: 8 }}>Falsches Passwort</div>}
-        <button className="btn" style={{ width: "100%" }} onClick={check}>Einloggen →</button>
+// ── Admin Login ──────────────────────────────────────────────────
+function AdminLogin({onLogin}) {
+  const [pw,setPw]=useState("");const [err,setErr]=useState(false);
+  function check(){if(pw===ADMIN_PASSWORD){sessionStorage.setItem("ks2admin","1");onLogin();}else{setErr(true);setTimeout(()=>setErr(false),2000);}}
+  return(
+    <div className="app"><style>{CSS}</style>
+      <div className="login-w">
+        <div className="hdr-sub">KS2 · Immobilien</div>
+        <div style={{fontFamily:"'DM Serif Display',serif",fontSize:28,marginBottom:24}}>Admin<br/><em style={{fontStyle:"italic",color:"var(--accent)"}}>Zugang</em></div>
+        <input className="ifield" type="password" placeholder="Passwort" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>e.key==="Enter"&&check()} style={{width:"100%",marginBottom:8,borderColor:err?"var(--accent)":undefined}}/>
+        {err&&<div style={{color:"var(--accent)",fontSize:11,marginBottom:8}}>Falsches Passwort</div>}
+        <button className="btn" style={{width:"100%"}} onClick={check}>Einloggen →</button>
       </div>
     </div>
   );
 }
 
-// ── Admin Page ─────────────────────────────────────────────────────
+// ── Admin Page ───────────────────────────────────────────────────
 function AdminPage() {
-  const [mandanten, setMandanten] = useState({});
-  const [name, setName] = useState("");
-  const [copiedId, setCopiedId] = useState(null);
-  const [toast, setToast] = useState(null);
-  const [details, setDetails] = useState({});
-  const [expandedId, setExpandedId] = useState(null);
-  const [crmText, setCrmText] = useState("");
+  const [mandanten,setMandanten]=useState({});
+  const [name,setName]=useState("");
+  const [copiedId,setCopiedId]=useState(null);
+  const [toast,setToast]=useState(null);
+  const [details,setDetails]=useState({});
+  const [expandedId,setExpandedId]=useState(null);
 
-  useEffect(() => {
-    loadMandanten().then(m => {
+  useEffect(()=>{
+    loadMandanten().then(m=>{
       setMandanten(m);
-      Object.keys(m).forEach(id => {
-        loadMandantData(id).then(d => { if (d) setDetails(p => ({ ...p, [id]: d })); });
-      });
+      Object.keys(m).forEach(id=>{ loadMandantData(id).then(d=>{if(d)setDetails(p=>({...p,[id]:d}));}); });
     });
-  }, []);
+  },[]);
 
-  async function handleCreate() {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    const parts = trimmed.split(" ");
-    const id = generateId();
-    const newM = { ...mandanten, [id]: { vorname: parts[0], nachname: parts.slice(1).join(" "), createdAt: new Date().toISOString() } };
-    await saveMandanten(newM);
-    await saveMandantData(id, { vorname: parts[0], nachname: parts.slice(1).join(" "), uploads: {}, selbstauskunft: null, crmData: null, adminData: {} });
-    setMandanten(newM);
-    setName("");
-    setToast(`${trimmed} angelegt ✓`);
+  async function handleCreate(){
+    const t=name.trim();if(!t)return;
+    const p=t.split(" ");const id=genId();
+    const nm={...mandanten,[id]:{vorname:p[0],nachname:p.slice(1).join(" "),createdAt:new Date().toISOString()}};
+    await saveMandanten(nm);
+    await saveMandantData(id,{vorname:p[0],nachname:p.slice(1).join(" "),uploads:{},selbstauskunft:null,crmData:null,adminData:{}});
+    setMandanten(nm);setName("");setToast(`${t} angelegt ✓`);
   }
 
-  async function handleDelete(id) {
-    const newM = { ...mandanten };
-    delete newM[id];
-    await saveMandanten(newM);
-    setMandanten(newM);
+  async function handleDelete(id){const nm={...mandanten};delete nm[id];await saveMandanten(nm);setMandanten(nm);}
+
+  function handleCopy(id){navigator.clipboard.writeText(genLink(id));setCopiedId(id);setTimeout(()=>setCopiedId(null),2000);}
+
+  async function handleCRMUpload(id,file){
+    const text=await file.text();const parsed=parseCRM(text);
+    const d=await loadMandantData(id);const nd={...d,crmData:parsed};
+    await saveMandantData(id,nd);setDetails(p=>({...p,[id]:nd}));setToast("CRM-Daten importiert ✓");
   }
 
-  function handleCopy(id) {
-    navigator.clipboard.writeText(generateLink(id));
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+  async function handlePersoUpload(id,file){
+    // Use Claude API to extract data from ID document
+    const toBase64=(f)=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(",")[1]);r.onerror=rej;r.readAsDataURL(f);});
+    const b64=await toBase64(file);
+    const mediaType=file.type||"image/jpeg";
+    setToast("Ausweis wird ausgelesen…");
+    try {
+      const resp=await fetch("https://api.anthropic.com/v1/messages",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          model:"claude-sonnet-4-20250514",
+          max_tokens:1000,
+          messages:[{role:"user",content:[
+            {type:"image",source:{type:"base64",media_type:mediaType,data:b64}},
+            {type:"text",text:"Lies alle Daten aus diesem deutschen Personalausweis oder Reisepass aus. Antworte NUR mit einem JSON-Objekt mit diesen Feldern: vorname, nachname, geburtsname, geburtsdatum, geburtsort, strasse, plz_ort, staatsangehoerigkeit, ausweis_nr, ausstellungsbehoerde, ausstellungsdatum, gueltig_bis. Leere Felder als leeren String. Kein Markdown, kein Text drumherum."}
+          ]}]
+        })
+      });
+      const data=await resp.json();
+      const raw=data.content?.[0]?.text||"{}";
+      const clean=raw.replace(/```json|```/g,"").trim();
+      const parsed=JSON.parse(clean);
+      const d=await loadMandantData(id);
+      const nd={...d,adminData:{...(d.adminData||{}),...parsed}};
+      await saveMandantData(id,nd);setDetails(p=>({...p,[id]:nd}));
+      setToast("Ausweis-Daten ausgelesen ✓ – bitte prüfen!");
+    } catch(e){setToast("Fehler beim Auslesen – bitte manuell eintragen");}
   }
 
-  async function handleCRMUpload(id, file) {
-    const text = await file.text();
-    const parsed = parseCRMText(text);
-    const d = await loadMandantData(id);
-    const newData = { ...d, crmData: parsed };
-    await saveMandantData(id, newData);
-    setDetails(p => ({ ...p, [id]: newData }));
-    setToast("CRM-Daten importiert ✓");
+  async function handleAdminField(id,key,value){
+    const d=await loadMandantData(id);
+    const nd={...d,adminData:{...(d.adminData||{}),[key]:value}};
+    await saveMandantData(id,nd);setDetails(p=>({...p,[id]:nd}));
   }
 
-  async function handleAdminField(id, key, value) {
-    const d = await loadMandantData(id);
-    const newData = { ...d, adminData: { ...(d.adminData || {}), [key]: value } };
-    await saveMandantData(id, newData);
-    setDetails(p => ({ ...p, [id]: newData }));
+  function getProgress(id){
+    const d=details[id];if(!d)return"…";
+    const req=DOCS.filter(x=>x.required);
+    const done=req.filter(x=>(d.uploads?.[x.id]?.length??0)>0||d.uploads?.[`${x.id}_nodoc`]).length;
+    return`${done+(d.selbstauskunft?1:0)} / ${req.length+1}`;
   }
 
-  function getProgress(id) {
-    const d = details[id];
-    if (!d) return "…";
-    const req = DOKUMENT_KATEGORIEN.filter(x => x.required);
-    const done = req.filter(x => (d.uploads?.[x.id]?.length ?? 0) > 0).length;
-    return `${done + (d.selbstauskunft ? 1 : 0)} / ${req.length + 1}`;
-  }
+  const adminFields = [
+    {key:"ausweis_nr",label:"Ausweis-Nr."},
+    {key:"ausstellungsbehoerde",label:"Ausstellungsbehörde"},
+    {key:"ausstellungsdatum",label:"Ausstellungsdatum"},
+    {key:"gueltig_bis",label:"Gültig bis"},
+    {key:"geburtsort",label:"Geburtsort"},
+    {key:"geburtsname",label:"Geburtsname"},
+    {key:"strasse",label:"Straße, Hausnr."},
+    {key:"plz_ort",label:"PLZ, Ort"},
+    {key:"wohnhaft_seit",label:"Wohnhaft seit"},
+    {key:"iban",label:"IBAN"},
+    {key:"bic",label:"BIC"},
+    {key:"bank_seit",label:"Bankverbindung seit"},
+  ];
 
   return (
-    <div className="app">
-      <style>{CSS}</style>
-      <div className="header">
-        <div className="header-label">KS2 · Immobilien Einwertung</div>
-        <div className="header-title">Mandanten<br /><em>verwalten</em></div>
+    <div className="app"><style>{CSS}</style>
+      <div className="hdr">
+        <div className="hdr-sub">KS2 · Immobilien Einwertung</div>
+        <div className="hdr-title">Mandanten<br/><em>verwalten</em></div>
       </div>
 
-      <div className="panel">
-        <div className="section-label">Neuen Mandanten anlegen</div>
-        <div className="input-row">
-          <input className="input-field" placeholder="Max Mustermann" value={name}
-            onChange={e => setName(e.target.value)} onKeyDown={e => e.key === "Enter" && handleCreate()} />
+      <div className="card">
+        <span className="lbl">Neuen Mandanten anlegen</span>
+        <div className="row">
+          <input className="ifield" placeholder="Max Mustermann" value={name} onChange={e=>setName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleCreate()}/>
           <button className="btn" onClick={handleCreate}>Anlegen →</button>
         </div>
       </div>
 
-      {Object.keys(mandanten).length > 0 && (
+      {Object.keys(mandanten).length>0&&(
         <>
-          <div className="section-label">Aktive Mandanten</div>
-          <div className="mandant-list">
-            {Object.entries(mandanten).map(([id, m]) => {
-              const d = details[id];
-              const expanded = expandedId === id;
-              return (
-                <div key={id} style={{ border: "1px solid var(--line)", background: "var(--paper)" }}>
-                  <div className="mandant-item">
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <div className="mandant-name">{m.vorname} {m.nachname}</div>
-                        {d?.crmData && <span className="badge badge-success">CRM ✓</span>}
-                        {d?.adminData?.perso_nr && <span className="badge badge-success">Perso ✓</span>}
-                        {d?.adminData?.iban && <span className="badge badge-success">IBAN ✓</span>}
+          <span className="lbl">Aktive Mandanten</span>
+          <div className="m-list">
+            {Object.entries(mandanten).map(([id,m])=>{
+              const d=details[id];const exp=expandedId===id;
+              return(
+                <div key={id} className="m-item">
+                  <div className="m-row">
+                    <div style={{flex:1}}>
+                      <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                        <strong>{m.vorname} {m.nachname}</strong>
+                        {d?.crmData&&<span className="badge badge-ok">CRM</span>}
+                        {d?.adminData?.ausweis_nr&&<span className="badge badge-ok">Perso</span>}
+                        {d?.adminData?.iban&&<span className="badge badge-ok">IBAN</span>}
                       </div>
-                      <div className="mandant-progress">{getProgress(id)} Schritte</div>
-                      <div className="link-display">{generateLink(id)}</div>
+                      <div style={{fontSize:11,color:"var(--muted)",marginTop:2}}>{getProgress(id)} Schritte</div>
+                      <div className="link-s">{genLink(id)}</div>
                     </div>
-                    <div className="mandant-actions">
-                      <button className="btn btn-outline btn-sm" onClick={() => setExpandedId(expanded ? null : id)}>
-                        {expanded ? "▲" : "▼ Details"}
-                      </button>
-                      <button className="btn btn-outline btn-sm" onClick={() => handleCopy(id)}>{copiedId === id ? "✓" : "Link"}</button>
-                      <button className="btn btn-outline btn-sm" onClick={() => window.open(generateLink(id), "_blank")}>Öffnen</button>
-                      <button className="btn btn-danger btn-sm" onClick={() => handleDelete(id)}>×</button>
+                    <div className="m-acts">
+                      <button className="btn btn-o btn-sm" onClick={()=>setExpandedId(exp?null:id)}>{exp?"▲":"Details ▼"}</button>
+                      <button className="btn btn-o btn-sm" onClick={()=>handleCopy(id)}>{copiedId===id?"✓":"Link"}</button>
+                      <button className="btn btn-o btn-sm" onClick={()=>window.open(genLink(id),"_blank")}>Öffnen</button>
+                      <button className="btn btn-del btn-sm" onClick={()=>handleDelete(id)}>×</button>
                     </div>
                   </div>
 
-                  {expanded && (
-                    <div style={{ padding: "16px", borderTop: "1px solid var(--line)", background: "var(--cream)" }}>
-                      <div className="section-label">CRM-Import</div>
-                      <label className="btn btn-outline btn-sm" style={{ cursor: "pointer", display: "inline-block", marginBottom: 12 }}>
-                        📂 CRM-Datei hochladen (.txt/.pdf)
-                        <input type="file" className="file-input" accept=".txt,.pdf" onChange={e => handleCRMUpload(id, e.target.files[0])} />
+                  {exp&&(
+                    <div className="m-detail">
+                      <span className="lbl">CRM-Import</span>
+                      <label className="btn btn-o btn-sm" style={{cursor:"pointer",display:"inline-block",marginBottom:10}}>
+                        📂 CRM-Datei (.txt)
+                        <input type="file" className="file-in" accept=".txt,.pdf" onChange={e=>handleCRMUpload(id,e.target.files[0])}/>
                       </label>
-                      {d?.crmData && (
-                        <div style={{ fontSize: 11, color: "var(--success)", marginBottom: 12 }}>
-                          ✓ {d.crmData.vorname} {d.crmData.nachname} · {d.crmData.geburtsdatum} · {d.crmData.email}
-                        </div>
-                      )}
+                      {d?.crmData&&<div style={{fontSize:11,color:"var(--ok)",marginBottom:12}}>✓ {d.crmData.vorname} {d.crmData.nachname} · {d.crmData.email}</div>}
 
-                      <div className="section-label" style={{ marginTop: 12 }}>Personalausweis-Daten (von uns eingetragen)</div>
-                      <div className="crm-fields">
-                        {[
-                          { key: "perso_nr", label: "Ausweis-Nr." },
-                          { key: "perso_behoerde", label: "Ausstellungsbehörde" },
-                          { key: "perso_datum", label: "Ausstellungsdatum" },
-                          { key: "perso_gueltig", label: "Gültig bis" },
-                          { key: "geburtsort", label: "Geburtsort" },
-                          { key: "geburtsname", label: "Geburtsname" },
-                          { key: "wohnhaft_seit", label: "Wohnhaft seit" },
-                          { key: "iban", label: "IBAN" },
-                          { key: "bic", label: "BIC" },
-                          { key: "bank_seit", label: "Bankverbindung seit" },
-                        ].map(f => (
-                          <div key={f.key} className="form-group">
-                            <label className="form-label">{f.label}</label>
-                            <input className="form-input" value={d?.adminData?.[f.key] || ""}
-                              onChange={e => handleAdminField(id, f.key, e.target.value)}
-                              placeholder={f.label} />
+                      <span className="lbl" style={{marginTop:14}}>Personalausweis hochladen & Daten auslesen</span>
+                      <label className="btn btn-o btn-sm" style={{cursor:"pointer",display:"inline-block",marginBottom:10}}>
+                        🪪 Ausweis hochladen (KI liest aus)
+                        <input type="file" className="file-in" accept="image/*,application/pdf" onChange={e=>handlePersoUpload(id,e.target.files[0])}/>
+                      </label>
+
+                      <span className="lbl" style={{marginTop:14}}>Daten prüfen & ergänzen</span>
+                      <div className="grid2">
+                        {adminFields.map(f=>(
+                          <div key={f.key} className="fg">
+                            <span className="lbl">{f.label}</span>
+                            <input className="ifield" value={d?.adminData?.[f.key]||""} onChange={e=>handleAdminField(id,f.key,e.target.value)} placeholder={f.label}/>
                           </div>
                         ))}
                       </div>
@@ -744,16 +812,16 @@ function AdminPage() {
           </div>
         </>
       )}
-      {toast && <Toast msg={toast} onDone={() => setToast(null)} />}
+      {toast&&<Toast msg={toast} onDone={()=>setToast(null)}/>}
     </div>
   );
 }
 
-// ── Root ───────────────────────────────────────────────────────────
+// ── Root ─────────────────────────────────────────────────────────
 export default function App() {
-  const mandantId = getMandantIdFromUrl();
-  const [adminAuth, setAdminAuth] = useState(() => sessionStorage.getItem("ks2admin") === "1");
-  if (mandantId) return <MandantPage mandantId={mandantId} />;
-  if (!adminAuth) return <AdminLogin onLogin={() => setAdminAuth(true)} />;
-  return <AdminPage />;
+  const mandantId=getMandantId();
+  const [adminAuth,setAdminAuth]=useState(()=>sessionStorage.getItem("ks2admin")==="1");
+  if (mandantId) return <MandantPage mandantId={mandantId}/>;
+  if (!adminAuth) return <AdminLogin onLogin={()=>setAdminAuth(true)}/>;
+  return <AdminPage/>;
 }
