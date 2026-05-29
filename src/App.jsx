@@ -143,13 +143,13 @@ function generateLink(id) { return `${window.location.origin}${window.location.p
 function getMandantIdFromUrl() { return new URLSearchParams(window.location.search).get("mandant"); }
 
 async function loadMandanten() {
-  try { const r = await window.storage.get("mandanten"); return r ? JSON.parse(r.value) : {}; } catch { return {}; }
+  try { const r = localStorage.getItem("mandanten"); return r ? JSON.parse(r) : {}; } catch { return {}; }
 }
-async function saveMandanten(data) { await window.storage.set("mandanten", JSON.stringify(data)); }
+async function saveMandanten(data) { localStorage.setItem("mandanten", JSON.stringify(data)); }
 async function loadMandantData(id) {
-  try { const r = await window.storage.get(`mandant_${id}`); return r ? JSON.parse(r.value) : null; } catch { return null; }
+  try { const r = localStorage.getItem(`mandant_${id}`); return r ? JSON.parse(r) : null; } catch { return null; }
 }
-async function saveMandantData(id, data) { await window.storage.set(`mandant_${id}`, JSON.stringify(data)); }
+async function saveMandantData(id, data) { localStorage.setItem(`mandant_${id}`, JSON.stringify(data)); }
 
 // ── Google Drive API ──────────────────────────────────────────────
 function loadGoogleScript() {
