@@ -3,6 +3,9 @@ import { useState, useEffect, useRef, useCallback } from "react";
 const GOOGLE_CLIENT_ID = "875796881160-8vjs3un1i373mgm1b39rqle53qv3hmbu.apps.googleusercontent.com";
 const ADMIN_PASSWORD = "ks2admin2025";
 const FOLDER_NAME = "KS2-Mandanten";
+const EMAILJS_SERVICE = "service_0jj5ihm";
+const EMAILJS_TEMPLATE = "template_mamsnhk";
+const EMAILJS_PUBLIC = "KenDwBUdjTdLSbgM-";
 
 // ── Storage ──────────────────────────────────────────────────────
 async function loadMandanten() {
@@ -494,23 +497,62 @@ function MandantPage({mandantId}) {
     setShowSA(false); setToast("Selbstauskunft gespeichert ✓");
   }
 
+  function handleDownloadAll() {
+    const allFiles = Object.values(uploads).flat().filter(f => f && f._file);
+    if (allFiles.length === 0) { setToast("Keine Dateien zum Herunterladen"); return; }
+    allFiles.forEach((f, i) => {
+      setTimeout(() => {
+        const url = URL.createObjectURL(f._file);
+        const a = document.createElement("a");
+        a.href = url; a.download = f.name;
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, i * 300);
+    });
+    setToast(`${allFiles.length} Datei(en) werden heruntergeladen`);
+  }
+
   async function handleSubmit() {
     setUploading(true);
     try {
-      const tok = await getToken();
-      const rootId = await ensureFolder(tok, FOLDER_NAME);
-      const fId = await ensureFolder(tok, fullName, rootId);
-      for (const [,files] of Object.entries(uploads)) {
-        if (!Array.isArray(files)) continue;
-        for (const f of files) { if(f._file) await uploadFile(tok,f._file,fId); }
+      // Build SA summary
+      const saLines = selbstauskunft ? Object.entries(selbstauskunft)
+        .filter(([k,v])=>k!=="signature"&&v)
+        .map(([k,v])=>`${k}: ${v}`)
+        .join("\n") : "Nicht ausgefüllt";
+
+      // Build upload list
+      const uploadList = DOCS.map(d=>{
+        const files = uploads[d.id]??[];
+        const noDoc = uploads[`${d.id}_nodoc`];
+        if (noDoc) return `${d.label}: Kein Dokument vorhanden`;
+        if (files.length>0) return `${d.label}: ${files.map(f=>f.name).join(", ")}`;
+        return `${d.label}: Nicht hochgeladen`;
+      }).join("\n");
+
+      // Load emailjs
+      if (!window.emailjs) {
+        await new Promise((res,rej)=>{
+          const s=document.createElement("script");
+          s.src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js";
+          s.onload=res; s.onerror=rej;
+          document.head.appendChild(s);
+        });
+        window.emailjs.init({publicKey: EMAILJS_PUBLIC});
       }
-      if (selbstauskunft) {
-        const txt = Object.entries(selbstauskunft).map(([k,v])=>`${k}: ${v}`).join("\n");
-        await uploadText(tok,`Selbstauskunft_${fullName}.txt`,txt,fId);
-      }
+
+      await window.emailjs.send(EMAILJS_SERVICE, EMAILJS_TEMPLATE, {
+        title: `Einwertung – ${fullName}`,
+        name: fullName,
+        email: "einwertung@ks2.de",
+        message: `Neue Unterlagen eingereicht von: ${fullName}\n\n=== HOCHGELADENE DOKUMENTE ===\n${uploadList}\n\n=== SELBSTAUSKUNFT ===\n${saLines}`,
+      });
+
       setDone(true);
     } catch(e) {
-      setToast("Fehler – bitte erneut versuchen");
+      console.error(e);
+      setToast("Fehler beim Einreichen – bitte erneut versuchen");
     }
     setUploading(false);
   }
@@ -621,6 +663,12 @@ function MandantPage({mandantId}) {
       {!allDone&&<div style={{fontSize:11,color:"var(--muted)",textAlign:"center",marginTop:8}}>
         {!consent?"Bitte Datenschutzerklärung bestätigen":"Bitte alle Pflichtfelder ausfüllen"}
       </div>}
+
+      {Object.values(uploads).flat().filter(f=>f&&f._file).length > 0 && (
+        <button className="btn btn-o" style={{width:"100%",marginTop:10}} onClick={handleDownloadAll}>
+          ⬇ Alle Dokumente herunterladen
+        </button>
+      )}
 
       {showSA&&<SAWizard crmData={crmData} adminData={adminData} existing={selbstauskunft} onSave={handleSaveSA} onClose={()=>setShowSA(false)}/>}
       {toast&&<Toast msg={toast} onDone={()=>setToast(null)}/>}
@@ -789,13 +837,7 @@ function AdminPage() {
                       </label>
                       {d?.crmData&&<div style={{fontSize:11,color:"var(--ok)",marginBottom:12}}>✓ {d.crmData.vorname} {d.crmData.nachname} · {d.crmData.email}</div>}
 
-                      <span className="lbl" style={{marginTop:14}}>Personalausweis hochladen & Daten auslesen</span>
-                      <label className="btn btn-o btn-sm" style={{cursor:"pointer",display:"inline-block",marginBottom:10}}>
-                        🪪 Ausweis hochladen (KI liest aus)
-                        <input type="file" className="file-in" accept="image/*,application/pdf" onChange={e=>handlePersoUpload(id,e.target.files[0])}/>
-                      </label>
-
-                      <span className="lbl" style={{marginTop:14}}>Daten prüfen & ergänzen</span>
+                      <span className="lbl" style={{marginTop:14}}>Personalausweis-Daten (von Ausweis übertragen)</span>
                       <div className="grid2">
                         {adminFields.map(f=>(
                           <div key={f.key} className="fg">
