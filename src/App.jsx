@@ -796,11 +796,38 @@ function MandantPage({mandantId}) {
         {!consent?"Bitte Datenschutzerklärung bestätigen":"Bitte alle Pflichtfelder ausfüllen"}
       </div>}
 
-      {hasFiles&&(
-        <button className="btn btn-o" style={{width:"100%",marginTop:10}} onClick={handleDownloadAll}>
-          ⬇ Alle Dokumente herunterladen
-        </button>
-      )}
+      {/* Download buttons */}
+      <div className="divider"/>
+      <span className="lbl">Dokumente herunterladen</span>
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {selbstauskunft&&(
+          <button className="btn btn-o" style={{width:"100%",textAlign:"left"}} onClick={handleDownloadSA}>
+            📄 Selbstauskunft (PDF)
+          </button>
+        )}
+        {DOCS.map(dok=>{
+          const files=uploads[dok.id]??[];
+          const noDoc=uploads[`${dok.id}_nodoc`];
+          if(noDoc)return(
+            <div key={dok.id} style={{padding:"10px 16px",border:"1px solid var(--line)",fontSize:12,color:"var(--muted)"}}>
+              {dok.label}: Kein Dokument vorhanden
+            </div>
+          );
+          return files.map((f,i)=>(
+            <button key={`${dok.id}_${i}`} className="btn btn-o" style={{width:"100%",textAlign:"left"}} onClick={()=>{
+              if(!f.b64){setToast("Datei nicht mehr verfügbar");return;}
+              const blob=base64ToBlob(f.b64);
+              const url=URL.createObjectURL(blob);
+              const a=document.createElement("a");
+              a.href=url;a.download=f.name;
+              document.body.appendChild(a);a.click();
+              document.body.removeChild(a);URL.revokeObjectURL(url);
+            }}>
+              ⬇ {dok.label} – {f.name}
+            </button>
+          ));
+        })}
+      </div>
 
       {showSA&&<SAWizard crmData={crmData} adminData={adminData} existing={selbstauskunft} onSave={handleSaveSA} onClose={()=>setShowSA(false)}/>}
       {toast&&<Toast msg={toast} onDone={()=>setToast(null)}/>}
