@@ -63,210 +63,151 @@ function parseCRM(text) {
   };
 }
 
-// ── PDF Generator ────────────────────────────────────────────────
-async function generateSAPDF(sa, adminData, crmData, fullName) {
-  // Load jsPDF
-  if (!window.jspdf) {
-    await new Promise((res,rej) => {
-      const s = document.createElement("script");
-      s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
-      s.onload = res; s.onerror = rej;
-      document.head.appendChild(s);
-    });
-  }
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-  const W = 210, ml = 20, mr = 190, lw = 55;
-  let y = 20;
+// ── PDF Generator (pdf-lib, fills actual tecis vorlage) ──────────
+async function loadPdfLib() {
+  if (window.PDFLib) return window.PDFLib;
+  await new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js';
+    s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+  return window.PDFLib;
+}
 
-  function line(y2) { doc.setDrawColor(180); doc.line(ml, y2, mr, y2); }
-  function section(title, y2) {
-    doc.setFontSize(8); doc.setFont("helvetica","bold");
-    doc.text(title, ml, y2);
-    doc.setFont("helvetica","normal");
-    return y2 + 5;
-  }
-  function row(label, val, y2, full=false) {
-    doc.setFontSize(8); doc.setFont("helvetica","normal");
-    doc.setTextColor(100); doc.text(label, ml, y2+4);
-    doc.setTextColor(0);
-    if (full) {
-      doc.text(String(val||""), ml+lw, y2+4, {maxWidth: mr-ml-lw});
-    } else {
-      doc.text(String(val||""), ml+lw, y2+4);
-    }
-    line(y2+7);
-    return y2+8;
-  }
-  function twoCol(l1,v1,l2,v2,y2) {
-    const mid = ml + (mr-ml)/2 + 5;
-    doc.setFontSize(8); doc.setFont("helvetica","normal");
-    doc.setTextColor(100); doc.text(l1, ml, y2+4); doc.setTextColor(0); doc.text(String(v1||""), ml+30, y2+4);
-    doc.setTextColor(100); doc.text(l2, mid, y2+4); doc.setTextColor(0); doc.text(String(v2||""), mid+30, y2+4);
-    line(y2+7);
-    return y2+8;
-  }
+async function generateSAPDF(sa, adminData, crmData, fullName) {
+  const PDFLib = await loadPdfLib();
+  const { PDFDocument, rgb, StandardFonts } = PDFLib;
+
+  const vorlageBytes = await fetch('/sa_vorlage.pdf').then(r => r.arrayBuffer());
+  const pdfDoc = await PDFDocument.load(vorlageBytes);
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const pages = pdfDoc.getPages();
 
   const ad = adminData || {};
   const crm = crmData || {};
 
-  // Header
-  doc.setFontSize(14); doc.setFont("helvetica","bold");
-  doc.text("Selbstauskunft für die Beantragung einer Einwertung", ml, y); y += 5;
-  doc.setFontSize(8); doc.setFont("helvetica","normal"); doc.setTextColor(120);
-  doc.text("tecis Finanzdienstleistungen AG · Version 3.0", ml, y); y += 2;
-  doc.setTextColor(0);
-  doc.setDrawColor(0); doc.setLineWidth(0.5); doc.line(ml, y, mr, y); y += 6;
-  doc.setLineWidth(0.2);
-
-  // 1. Person
-  y = section("1. Angaben zur Person", y); y += 2;
-  y = row("Kundennummer", crm.kundennummer||ad.kundennummer, y);
-  y = row("Name", crm.nachname||ad.nachname, y);
-  y = row("Vorname", crm.vorname||ad.vorname, y);
-  y = row("Geburtsname", ad.geburtsname, y);
-  y = row("Geburtsdatum", crm.geburtsdatum||ad.geburtsdatum, y);
-  y = row("Geburtsort", ad.geburtsort, y);
-  y = row("PLZ, Wohnort", crm.plz_ort||ad.plz_ort, y);
-  y = row("Straße, Hausnummer", crm.strasse||ad.strasse, y);
-  y = row("Wohnhaft seit", ad.wohnhaft_seit, y);
-  y = row("Telefon", crm.telefon, y);
-  y = row("E-Mail", crm.email, y);
-  y = row("Staatsangehörigkeit", crm.staatsangehoerigkeit||"deutsch", y);
-  y = row("Berufsstatus", sa.berufsstatus, y);
-  y = row("Arbeitszeit", sa.arbeitszeit, y);
-  y = row("Berufsbezeichnung", sa.berufsbezeichnung, y);
-  y = row("Arbeitgeber", sa.arbeitgeber, y);
-  y = row("Beschäftigt seit", sa.beschaeftigt_seit, y);
-  y = row("Arbeitsverhältnis", sa.arbeitsverhaeltnis + (sa.befristet_bis ? ` bis ${sa.befristet_bis}` : ""), y);
-  if (sa.probezeit==="Ja") y = row("Probezeit bis", sa.probezeit_bis, y);
-  if (sa.berufsstatus==="selbstständig") y = row("Selbstständig seit", sa.selbststaendig_seit, y);
-  y += 4;
-
-  // 2. Familie
-  y = section("Familie & Güterstand", y); y += 2;
-  y = row("Familienstand", sa.familienstand, y);
-  y = row("Güterstand", sa.gueterstand, y);
-  y = row("Unterhaltsber. Kinder", sa.kinder_anzahl||"0", y);
-  for (let i=1;i<=parseInt(sa.kinder_anzahl||"0");i++) {
-    if (sa[`kind${i}_vorname`]) y = row(`Kind ${i}`, `${sa[`kind${i}_vorname`]||""} ${sa[`kind${i}_name`]||""}, geb. ${sa[`kind${i}_geb`]||""}`, y);
+  function v(...keys) {
+    for (const k of keys) {
+      const val = sa[k] || ad[k] || crm[k] || '';
+      if (val && String(val).trim()) return String(val).trim();
+    }
+    return '';
   }
-  y += 4;
 
-  // Page break check
-  if (y > 240) { doc.addPage(); y = 20; }
+  function euros(s) {
+    const n = parseFloat(String(s).replace(/[^0-9.,]/g,'').replace(',','.'));
+    return isNaN(n) ? 0 : n;
+  }
+  function fmt(n) {
+    if (!n) return '';
+    return n.toLocaleString('de-DE', {minimumFractionDigits:2,maximumFractionDigits:2}) + ' €';
+  }
 
-  // 3. Einkommen
-  y = section("2. Monatliches Nettoeinkommen in €", y); y += 2;
-  const einkSrc = [
-    ["Lohn/Gehalt netto", sa.eink_lohn],
-    ["Kindergeld gesamt", sa.eink_kindergeld],
-    ["Unterhalt Kinder (eingehend)", sa.eink_unterhalt_k],
-    ["Kapitaleinkünfte", sa.eink_kapital],
-    ["Selbstständige Tätigkeit", sa.eink_selbst],
-    ["Mieteinnahmen (kalt)", sa.eink_miete],
-    ["Renten/Pensionen", sa.eink_rente],
-    ["Sonstige Einnahmen", sa.eink_sonstige],
-  ];
-  einkSrc.forEach(([l,v]) => { if(v) y = row(l,v+"€",y); });
-  const einkSum = ["eink_lohn","eink_kindergeld","eink_unterhalt_k","eink_kapital","eink_selbst","eink_miete","eink_rente","eink_sonstige"].reduce((a,k)=>a+euros(sa[k]||"0"),0);
-  doc.setFont("helvetica","bold");
-  y = row("Gesamt", fmtEuros(einkSum), y);
-  doc.setFont("helvetica","normal");
-  y += 4;
+  const einkSum = ['eink_lohn','eink_kindergeld','eink_unterhalt_k','eink_kapital','eink_selbst','eink_miete','eink_rente','eink_sonstige'].reduce((a,k)=>a+euros(v(k)),0);
+  const ausgSum = ['ausg_miete','ausg_nk','ausg_vers','ausg_pkv','ausg_darlehen','ausg_raten','ausg_unterhalt','ausg_altersvorsorge','ausg_sonstige'].reduce((a,k)=>a+euros(v(k)),0);
+  const vermSum = ['verm_immobilien','verm_bank','verm_wertpapiere','verm_bausparer','verm_versicherung','verm_sonstiges'].reduce((a,k)=>a+euros(v(k)),0);
+  const verbSum = ['verb_hypotheken','verb_kredite','verb_sonstige','verb_buergschaften'].reduce((a,k)=>a+euros(v(k)),0);
 
-  // 4. Ausgaben
-  y = section("3. Monatliche Ausgaben in €", y); y += 2;
-  const ausgSrc = [
-    ["Miete", sa.ausg_miete],
-    ["Nebenkosten", sa.ausg_nk],
-    ["Versicherungen/Bauspar", sa.ausg_vers],
-    ["Private KV", sa.ausg_pkv],
-    ["Darlehen (monatl. Rate)", sa.ausg_darlehen],
-    ["Sonstige Raten", sa.ausg_raten],
-    ["Unterhaltszahlungen", sa.ausg_unterhalt],
-    ["Altersvorsorge (Selbst.)", sa.ausg_altersvorsorge],
-    ["Sonstige Ausgaben", sa.ausg_sonstige],
-  ];
-  ausgSrc.forEach(([l,v]) => { if(v) y = row(l,v+"€",y); });
-  const ausgSum = ["ausg_miete","ausg_nk","ausg_vers","ausg_pkv","ausg_darlehen","ausg_raten","ausg_unterhalt","ausg_altersvorsorge","ausg_sonstige"].reduce((a,k)=>a+euros(sa[k]||"0"),0);
-  doc.setFont("helvetica","bold");
-  y = row("Gesamt Ausgaben", fmtEuros(ausgSum), y);
-  doc.setFont("helvetica","normal");
-  y += 4;
+  const H = 841.89;
+  const FS = 8;
+  const EX = 200;
 
-  if (y > 220) { doc.addPage(); y = 20; }
+  function draw(page, x, structTop, text, fs=FS) {
+    if (!text||!String(text).trim()) return;
+    page.drawText(String(text).trim(), {x, y: H-structTop-fs, size:fs, font, color:rgb(0,0,0)});
+  }
 
-  // 5. Rente
-  y = section("Rentenansprüche (monatlich, Schätzung)", y); y += 2;
-  y = row("Gesetzliche Rente", sa.rente_gesetzlich ? sa.rente_gesetzlich+"€" : "", y);
-  y = row("Private Renten/LV", sa.rente_privat ? sa.rente_privat+"€" : "", y);
-  y += 4;
+  // PAGE 1
+  const p1 = pages[0];
+  draw(p1,EX,128.4,v('kundennummer'));
+  draw(p1,EX,170.9,v('nachname'));
+  draw(p1,EX,192.1,v('vorname'));
+  draw(p1,EX,213.4,v('geburtsname'));
+  draw(p1,EX,234.7,v('geburtsdatum'));
+  draw(p1,EX,255.9,v('geburtsort'));
+  draw(p1,EX,277.2,v('plz_ort'));
+  draw(p1,EX,298.5,v('strasse'));
+  draw(p1,EX,319.7,v('wohnhaft_seit'));
+  draw(p1,EX,341.0,v('telefon'));
+  draw(p1,EX,362.2,v('email'));
+  draw(p1,EX,383.5,v('staatsangehoerigkeit'));
+  draw(p1,EX,462.1,v('berufsstatus'));
+  draw(p1,EX,498.3,v('arbeitszeit'));
+  draw(p1,EX,519.5,v('probezeit')+(v('probezeit_bis')?' / bis '+v('probezeit_bis'):''));
+  draw(p1,EX,540.8,v('arbeitsverhaeltnis')+(v('befristet_bis')?' bis '+v('befristet_bis'):''));
+  draw(p1,EX,583.3,v('berufsbezeichnung'));
+  draw(p1,EX,613.8,v('arbeitgeber'));
+  draw(p1,EX,644.3,v('beschaeftigt_seit'));
+  draw(p1,EX,686.8,v('selbststaendig_seit'));
 
-  // 6. Vermögen
-  y = section("4. Vermögen in €", y); y += 2;
-  const vermSrc = [
-    ["Immobilien (Verkehrswert)", sa.verm_immobilien],
-    ["Bank-/Sparguthaben", sa.verm_bank],
-    ["Wertpapiere/Depot", sa.verm_wertpapiere],
-    ["Bausparvertrag", sa.verm_bausparer],
-    ["LV Rückkaufswert", sa.verm_versicherung],
-    ["Sonstiges", sa.verm_sonstiges],
-  ];
-  vermSrc.forEach(([l,v]) => { if(v) y = row(l,v+"€",y); });
-  const vermSum = ["verm_immobilien","verm_bank","verm_wertpapiere","verm_bausparer","verm_versicherung","verm_sonstiges"].reduce((a,k)=>a+euros(sa[k]||"0"),0);
-  doc.setFont("helvetica","bold");
-  y = row("Gesamt Vermögen", fmtEuros(vermSum), y);
-  doc.setFont("helvetica","normal");
-  y = row("Einsetzbares Kapital", sa.einsetzbar ? sa.einsetzbar+"€" : "", y);
-  y += 4;
+  // PAGE 2
+  const p2 = pages[1];
+  draw(p2,EX,122.0,v('familienstand'));
+  draw(p2,EX,154.7,v('gueterstand'));
+  [185.8,202.8,219.8,236.8].forEach((ky,i)=>{
+    const n=i+1, kv=v(`kind${n}_vorname`);
+    if(kv){draw(p2,195,ky,kv,7);draw(p2,330,ky,v(`kind${n}_name`),7);draw(p2,500,ky,v(`kind${n}_geb`),7);}
+  });
+  draw(p2,190,295.7,v('eink_lohn'));
+  if(v('eink_anzahl_mg')) draw(p2,240,295.7,'/ '+v('eink_anzahl_mg'));
+  draw(p2,190,357.4,v('eink_kindergeld'));
+  draw(p2,190,397.1,v('eink_unterhalt_k'));
+  draw(p2,190,414.1,v('eink_selbst'));
+  draw(p2,190,431.1,v('eink_miete'));
+  draw(p2,190,448.1,v('eink_kapital'));
+  draw(p2,190,465.1,v('eink_rente'));
+  draw(p2,190,482,v('eink_sonstige'));
+  draw(p2,190,516.2,fmt(einkSum));
+  draw(p2,530,300.7,v('ausg_miete'));
+  draw(p2,530,329.1,v('ausg_nk'));
+  draw(p2,530,352.4,v('ausg_vers'));
+  draw(p2,530,380.1,v('ausg_darlehen'));
+  draw(p2,530,397.1,v('ausg_raten'));
+  draw(p2,530,414.1,v('ausg_altersvorsorge'));
+  draw(p2,530,431.1,v('ausg_pkv'));
+  draw(p2,530,448.1,v('ausg_unterhalt'));
+  draw(p2,530,465.1,v('ausg_sonstige'));
+  draw(p2,530,516.2,fmt(ausgSum));
+  draw(p2,530,562,v('rente_gesetzlich'));
+  draw(p2,530,585,v('rente_privat'));
 
-  // 7. Verbindlichkeiten
-  y = section("5. Verbindlichkeiten in €", y); y += 2;
-  y = row("Hypotheken/Grundschulden", sa.verb_hypotheken ? sa.verb_hypotheken+"€" : "0€", y);
-  y = row("Bank-/Privatkredite", sa.verb_kredite ? sa.verb_kredite+"€" : "0€", y);
-  y = row("Sonstige", sa.verb_sonstige ? sa.verb_sonstige+"€" : "0€", y);
-  y = row("Bürgschaften", sa.verb_buergschaften ? sa.verb_buergschaften+"€" : "0€", y);
-  const verbSum = ["verb_hypotheken","verb_kredite","verb_sonstige","verb_buergschaften"].reduce((a,k)=>a+euros(sa[k]||"0"),0);
-  doc.setFont("helvetica","bold");
-  y = row("Gesamt Verbindlichkeiten", fmtEuros(verbSum), y);
-  doc.setFont("helvetica","normal");
-  y += 4;
+  // PAGE 3
+  const p3 = pages[2];
+  draw(p3,170,120,v('verm_immobilien'));
+  draw(p3,170,140.2,v('verm_bank'));
+  draw(p3,170,156.6,v('verm_wertpapiere'));
+  draw(p3,170,174.2,v('verm_bausparer'));
+  draw(p3,170,190.3,v('verm_versicherung'));
+  draw(p3,170,214.3,v('verm_sonstiges'));
+  draw(p3,170,231.3,fmt(vermSum));
+  draw(p3,383,120,v('verb_hypotheken'));
+  draw(p3,383,140.2,v('verb_kredite'));
+  draw(p3,383,174.2,v('verb_sonstige'));
+  draw(p3,383,194.3,v('verb_buergschaften'));
+  draw(p3,383,222.8,fmt(verbSum));
+  draw(p3,65,295.7,v('iban'));
+  draw(p3,232,295.7,v('bic'));
+  draw(p3,440,295.7,v('bank_seit'));
+  draw(p3,198,370.3,v('ausweis_nr'));
+  draw(p3,400,370.3,[v('ausstellungsbehoerde'),v('ausstellungsdatum'),v('gueltig_bis')].filter(Boolean).join(', '),7);
 
-  // 8. Bankverbindung
-  y = section("6. Bankverbindung", y); y += 2;
-  y = row("IBAN", ad.iban, y);
-  y = row("BIC", ad.bic, y);
-  y = row("Bankverbindung seit", ad.bank_seit, y);
-  y += 4;
-
-  // 9. Erklärung
-  if (y > 220) { doc.addPage(); y = 20; }
-  y = section("7. Erklärung (Geldwäschegesetz)", y); y += 2;
-  y = row("Personalausweis-Nr.", ad.ausweis_nr, y);
-  y = row("Ausstellungsbehörde", ad.ausstellungsbehoerde, y);
-  y = row("Ausstellungsdatum", ad.ausstellungsdatum, y);
-  y = row("Gültig bis", ad.gueltig_bis, y);
-  y += 8;
+  // PAGE 4
+  const p4 = pages[3];
+  draw(p4,44,546.5,`___________, ${new Date().toLocaleDateString('de-DE')}`);
 
   // Signature
-  if (y > 230) { doc.addPage(); y = 20; }
-  doc.setFontSize(8); doc.setTextColor(100);
-  doc.text("Ort, Datum", ml, y+4);
-  doc.text("Unterschrift des Kunden", ml+80, y+4);
-  doc.setTextColor(0);
-  if (sa.signature) {
-    try { doc.addImage(sa.signature, "PNG", ml+75, y-8, 60, 20); } catch(e) {}
+  const sig = sa.signature;
+  if(sig&&sig.startsWith('data:image')) {
+    try {
+      const b64=sig.split(',')[1];
+      const sigBytes=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
+      const sigImg = sig.includes('png') ? await pdfDoc.embedPng(sigBytes) : await pdfDoc.embedJpg(sigBytes);
+      p4.drawImage(sigImg,{x:290,y:H-546.5-5,width:120,height:25});
+    } catch(e){console.warn('Sig:',e);}
   }
-  doc.line(ml, y+6, ml+65, y+6);
-  doc.line(ml+75, y+6, mr, y+6);
-  y += 20;
 
-  // Footer
-  doc.setFontSize(7); doc.setTextColor(150);
-  doc.text(`Erstellt am ${new Date().toLocaleDateString("de-DE")} · KS2 Einwertungsprozess`, ml, y);
-
-  return doc;
+  return await pdfDoc.save();
 }
 
 // ── CSS ──────────────────────────────────────────────────────────
@@ -649,8 +590,13 @@ function MandantPage({mandantId}) {
     if(!selbstauskunft){setToast("Bitte erst Selbstauskunft ausfüllen");return;}
     setToast("PDF wird erstellt…");
     try{
-      const doc=await generateSAPDF(selbstauskunft,adminData,crmData,fullName);
-      doc.save(`Selbstauskunft_${fullName}.pdf`);
+      const bytes=await generateSAPDF(selbstauskunft,adminData,crmData,fullName);
+      const blob=new Blob([bytes],{type:'application/pdf'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url;a.download=`Selbstauskunft_${fullName}.pdf`;
+      document.body.appendChild(a);a.click();
+      document.body.removeChild(a);URL.revokeObjectURL(url);
     }catch(e){console.error(e);setToast("Fehler beim PDF erstellen");}
   }
 
@@ -898,8 +844,13 @@ function AdminPage(){
     setToast("PDF wird erstellt…");
     try{
       const fullName=`${d.vorname} ${d.nachname}`;
-      const doc=await generateSAPDF(d.selbstauskunft,d.adminData,d.crmData,fullName);
-      doc.save(`Selbstauskunft_${fullName}.pdf`);
+      const bytes=await generateSAPDF(d.selbstauskunft,d.adminData,d.crmData,fullName);
+      const blob=new Blob([bytes],{type:'application/pdf'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url;a.download=`Selbstauskunft_${fullName}.pdf`;
+      document.body.appendChild(a);a.click();
+      document.body.removeChild(a);URL.revokeObjectURL(url);
     }catch(e){console.error(e);setToast("Fehler beim PDF erstellen");}
   }
 
