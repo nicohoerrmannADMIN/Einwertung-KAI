@@ -1003,8 +1003,7 @@ function AdminPage(){
         for (let i = 1; i <= pdfDoc.numPages; i++) {
           const page = await pdfDoc.getPage(i);
           const content = await page.getTextContent();
-          text += content.items.map(item => item.str).join(' ') + '
-';
+          text += content.items.map(item => item.str).join(' ') + '\n';
         }
       } catch(e) {
         console.error('PDF parse error:', e);
