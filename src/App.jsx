@@ -975,8 +975,6 @@ function AdminPage(){
   );
 }
 
-function genLink(id){return`${window.location.origin}${window.location.pathname}?mandant=${id}`;}
-
 export default function App(){
   const mandantId=getMandantId();
   const [adminAuth,setAdminAuth]=useState(()=>sessionStorage.getItem("ks2admin")==="1");
