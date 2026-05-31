@@ -980,9 +980,44 @@ function AdminPage(){
   function handleCopy(id){navigator.clipboard.writeText(genLink(id));setCopiedId(id);setTimeout(()=>setCopiedId(null),2000);}
 
   async function handleCRMUpload(id,file){
-    const text=await file.text();const parsed=parseCRM(text);
+    let text = "";
+    if (file.type === "application/pdf" || file.name.endsWith(".pdf")) {
+      // Extract text from PDF using pdf-lib
+      try {
+        const PDFLib = await loadPdfLib();
+        const bytes = await file.arrayBuffer();
+        const pdf = await PDFLib.PDFDocument.load(bytes);
+        // Use basic text extraction via getting all text content
+        // Since pdf-lib doesn't extract text natively, use pdfjs-dist
+        if (!window.pdfjsLib) {
+          await new Promise((res,rej) => {
+            const s = document.createElement('script');
+            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+            s.onload = res; s.onerror = rej;
+            document.head.appendChild(s);
+          });
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+        const arrayBuf = await file.arrayBuffer();
+        const pdfDoc = await window.pdfjsLib.getDocument({data: arrayBuf}).promise;
+        for (let i = 1; i <= pdfDoc.numPages; i++) {
+          const page = await pdfDoc.getPage(i);
+          const content = await page.getTextContent();
+          text += content.items.map(item => item.str).join(' ') + '
+';
+        }
+      } catch(e) {
+        console.error('PDF parse error:', e);
+        setToast("Fehler beim Lesen der PDF – bitte als .txt exportieren");
+        return;
+      }
+    } else {
+      text = await file.text();
+    }
+    const parsed = parseCRM(text);
     const d=await loadMandantData(id);const nd={...d,crmData:parsed};
-    await saveMandantData(id,nd);setDetails(p=>({...p,[id]:nd}));setToast("CRM-Daten importiert ✓");
+    await saveMandantData(id,nd);setDetails(p=>({...p,[id]:nd}));
+    setToast(`CRM importiert ✓ – ${parsed.vorname} ${parsed.nachname}, Kd-Nr. ${parsed.kundennummer}`);
   }
 
   async function handleAdminField(id,key,value){
