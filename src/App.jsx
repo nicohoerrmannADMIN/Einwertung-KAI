@@ -494,11 +494,11 @@ function SAWizard({crmData, adminData, existing, onSave, onClose}) {
 
 // ── Dokument Kategorien ──────────────────────────────────────────
 const DOCS = [
-  {id:"eigenkapital",label:"Eigenkapitalnachweis",sublabel:"Kontoauszug oder Depotauszug",hint:"Name, Datum und Vermögensbetrag in € müssen auf der gleichen Seite erkennbar sein.",required:true},
-  {id:"steuerbescheid",label:"Steuerbescheid",sublabel:"Aktuellster vorliegender Bescheid",hint:null,required:true,noDoc:true,noDocLabel:"Kein Steuerbescheid vorhanden (keine Steuererklärung abgegeben)"},
-  {id:"lohn1",label:"Gehaltsnachweis",sublabel:"Letzter vollständiger Monat",hint:"Foto direkt mit der Kamera möglich.",required:true,camera:true},
-  {id:"lohn2",label:"Gehaltsnachweis",sublabel:"Vorletzter vollständiger Monat",hint:null,required:true,camera:true},
-  {id:"lohn3",label:"Gehaltsnachweis",sublabel:"Drittletzter vollständiger Monat",hint:null,required:true,camera:true},
+  {id:"eigenkapital",label:"Eigenkapitalnachweis",sublabel:"Kontoauszug oder Depotauszug",hint:"Name, Datum und Vermögensbetrag in € müssen auf der gleichen Seite erkennbar sein.",required:true,canHaveAlready:true},
+  {id:"steuerbescheid",label:"Steuerbescheid",sublabel:"Aktuellster vorliegender Bescheid",hint:null,required:true,noDoc:true,noDocLabel:"Kein Steuerbescheid vorhanden (keine Steuererklärung abgegeben)",canHaveAlready:true},
+  {id:"lohn1",label:"Gehaltsnachweis",sublabel:"Letzter vollständiger Monat",hint:"Foto direkt mit der Kamera möglich.",required:true,camera:true,canHaveAlready:true},
+  {id:"lohn2",label:"Gehaltsnachweis",sublabel:"Vorletzter vollständiger Monat",hint:null,required:true,camera:true,canHaveAlready:true},
+  {id:"lohn3",label:"Gehaltsnachweis",sublabel:"Drittletzter vollständiger Monat",hint:null,required:true,camera:true,canHaveAlready:true},
 ];
 
 // ── Mandant Page ─────────────────────────────────────────────────
@@ -519,7 +519,7 @@ function MandantPage({mandantId}) {
   const {vorname,nachname,uploads={},selbstauskunft=null,crmData=null,adminData={}}=data;
   const fullName=`${vorname} ${nachname}`;
   const reqDocs=DOCS.filter(d=>d.required);
-  const doneReq=reqDocs.filter(d=>(uploads[d.id]?.length??0)>0||uploads[`${d.id}_nodoc`]).length;
+  const doneReq=reqDocs.filter(d=>(uploads[d.id]?.length??0)>0||uploads[`${d.id}_nodoc`]||uploads[`${d.id}_already`]).length;
   const totalSteps=reqDocs.length+1;
   const doneSteps=doneReq+(selbstauskunft?1:0);
   const pct=Math.round((doneSteps/totalSteps)*100);
@@ -548,6 +548,18 @@ function MandantPage({mandantId}) {
 
   async function handleUndoNoDoc(docId){
     const newU={...uploads};delete newU[`${docId}_nodoc`];
+    const nd={...data,uploads:newU};
+    setData(nd);await saveMandantData(mandantId,nd);
+  }
+
+  async function handleAlreadyHave(docId){
+    const newU={...uploads,[`${docId}_already`]:true};
+    const nd={...data,uploads:newU};
+    setData(nd);await saveMandantData(mandantId,nd);setToast("✓ Als vorhanden markiert");
+  }
+
+  async function handleUndoAlready(docId){
+    const newU={...uploads};delete newU[`${docId}_already`];
     const nd={...data,uploads:newU};
     setData(nd);await saveMandantData(mandantId,nd);
   }
@@ -606,6 +618,8 @@ function MandantPage({mandantId}) {
       const uploadList=DOCS.map(d=>{
         const files=uploads[d.id]??[];
         const noDoc=uploads[`${d.id}_nodoc`];
+        const already=uploads[`${d.id}_already`];
+        if(already)return`${d.label}: ✓ Bereits vorhanden`;
         if(noDoc)return`${d.label}: Kein Dokument`;
         if(files.length>0)return`${d.label}: ${files.map(f=>f.name).join(", ")}`;
         return`${d.label}: Nicht hochgeladen`;
@@ -684,7 +698,7 @@ function MandantPage({mandantId}) {
                 )}
               </div>
             </div>
-            {dok.noDoc&&!noDoc&&files.length===0&&(
+            {dok.noDoc&&!noDoc&&files.length===0&&!uploads[`${dok.id}_already`]&&(
               <div style={{padding:"0 14px 12px 32px"}}>
                 <button className="btn btn-o btn-sm" onClick={()=>handleNoDoc(dok.id)}>☐ {dok.noDocLabel}</button>
               </div>
@@ -693,6 +707,17 @@ function MandantPage({mandantId}) {
               <div style={{padding:"0 14px 12px 32px",display:"flex",alignItems:"center",gap:8}}>
                 <span style={{fontSize:11,color:"var(--ok)"}}>☑ {dok.noDocLabel}</span>
                 <button className="btn btn-del btn-sm" onClick={()=>handleUndoNoDoc(dok.id)}>Rückgängig</button>
+              </div>
+            )}
+            {dok.canHaveAlready&&!uploads[`${dok.id}_already`]&&files.length===0&&!noDoc&&(
+              <div style={{padding:"0 14px 12px 32px"}}>
+                <button className="btn btn-o btn-sm" style={{color:"var(--ok)",borderColor:"var(--ok)"}} onClick={()=>handleAlreadyHave(dok.id)}>☐ Bereits vorhanden – liegt bei uns vor</button>
+              </div>
+            )}
+            {uploads[`${dok.id}_already`]&&(
+              <div style={{padding:"0 14px 12px 32px",display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:11,color:"var(--ok)"}}>☑ Bereits vorhanden – liegt bei uns vor</span>
+                <button className="btn btn-del btn-sm" onClick={()=>handleUndoAlready(dok.id)}>Rückgängig</button>
               </div>
             )}
             {files.length>0&&(
