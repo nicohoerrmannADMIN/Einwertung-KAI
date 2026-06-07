@@ -46,59 +46,75 @@ function base64ToBlob(dataUrl) {
 
 // ── CRM Parser ───────────────────────────────────────────────────
 function parseCRM(text) {
-  const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
+  // Works with both multi-line and single-line pdfjs output
+  // Normalize: replace multiple spaces with single space
+  const flat = text.replace(/[ \t]+/g, ' ');
 
-  function getField(label) {
+  function getVal(label) {
+    // Try "Label Value" pattern (single-line pdfjs output)
+    const re = new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '\\s+([^\n]+?)(?=\\s+[A-ZÄÖÜ][a-zäöüß]|$)', 'i');
+    const m = flat.match(re);
+    if (m) {
+      const val = m[1].trim();
+      // Reject if value looks like next label (all caps or too long)
+      if (val && val.length < 60) return val;
+    }
+    // Try line-by-line
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
     for (let i = 0; i < lines.length; i++) {
-      const l = lines[i];
-      // Match "Label Wert" on same line
-      const m = l.match(new RegExp(`^${label}\\s+(.+)$`, "i"));
-      if (m) return m[1].trim();
-      // Match "Label" on one line, value on next
-      if (l.toLowerCase() === label.toLowerCase() && lines[i+1]) {
+      const lm = lines[i].match(new RegExp('^' + label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '\\s+(.+)$', 'i'));
+      if (lm) return lm[1].trim();
+      if (lines[i].toLowerCase() === label.toLowerCase() && lines[i+1])
         return lines[i+1].trim();
-      }
     }
-    return "";
+    return '';
   }
 
-  // Kundennummer: line "Kunde 189611203"
-  const kundeMatch = text.match(/^Kunde\s+(\d+)/m);
-  const kundennummer = kundeMatch ? kundeMatch[1].trim() : "";
+  // Kundennummer: "Kunde 189611203"
+  const knMatch = flat.match(/\bKunde\s+(\d{5,})/);
+  const kundennummer = knMatch ? knMatch[1] : '';
 
-  // Adresse: line "Adresse Straße Hausnr" then next line "PLZ Ort"
-  let strasse = "", plz_ort = "";
-  const adresseIdx = lines.findIndex(l => /^Adresse\s+/i.test(l));
-  if (adresseIdx >= 0) {
-    strasse = lines[adresseIdx].replace(/^Adresse\s+/i, "").trim();
-    // Next line should be PLZ Ort
-    if (lines[adresseIdx+1] && /^\d{5}/.test(lines[adresseIdx+1])) {
-      plz_ort = lines[adresseIdx+1].trim();
+  // Adresse: "Adresse Straße Hausnr" followed by "PLZ Ort"
+  let strasse = '', plz_ort = '';
+  const addrMatch = flat.match(/Adresse\s+(.+?)\s+(\d{5}\s+\S[^\n]*?)(?=\s+[A-ZÄÖÜ]|$)/);
+  if (addrMatch) {
+    strasse = addrMatch[1].trim();
+    plz_ort = addrMatch[2].trim();
+  } else {
+    // Multi-line fallback
+    const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
+    const ai = lines.findIndex(l => /^Adresse\s+/i.test(l));
+    if (ai >= 0) {
+      strasse = lines[ai].replace(/^Adresse\s+/i,'').trim();
+      if (lines[ai+1] && /^\d{5}/.test(lines[ai+1])) plz_ort = lines[ai+1];
     }
   }
 
-  // Telefon: line starting with +49 after "Privat"
-  const telefonMatch = text.match(/Privat[\s\S]*?(\+49[\s\d]+)/m);
-  const telefon = telefonMatch ? telefonMatch[1].replace(/\s+/g," ").trim() : "";
+  // Telefon: after "Privat" find +49 number
+  const telMatch = flat.match(/Privat\s+(\+49[\d\s]+?)(?=\s*[-–]|\s+[A-ZÄÖÜ]|$)/);
+  const telefon = telMatch ? telMatch[1].replace(/\s+/g,' ').trim() : '';
 
-  // Email: any @-address
-  const emailMatch = text.match(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/i);
-  const email = emailMatch ? emailMatch[0].trim() : "";
+  // Email: strict pattern requiring TLD
+  const emailMatch = flat.match(/[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}/);
+  const email = emailMatch ? emailMatch[0] : '';
+
+  // Geburtsort: can be empty in CRM
+  const geburtsort = getVal('Geburtsort');
 
   return {
     kundennummer,
-    vorname: getField("Vorname"),
-    nachname: getField("Nachname"),
-    geburtsdatum: getField("Geburtsdatum"),
-    geburtsort: getField("Geburtsort"),
+    vorname: getVal('Vorname'),
+    nachname: getVal('Nachname'),
+    geburtsdatum: getVal('Geburtsdatum'),
+    geburtsort: geburtsort && !/^[A-Z]/.test(geburtsort) ? '' : geburtsort,
     strasse,
     plz_ort,
     telefon,
     email,
-    familienstand: getField("Familienstand"),
-    staatsangehoerigkeit: getField("Staatsangehörigkeit"),
-    beruf: getField("Ausgeübte Tätigkeit"),
-    anrede: getField("Anrede / Akad. Grad"),
+    familienstand: getVal('Familienstand'),
+    staatsangehoerigkeit: getVal('Staatsangehörigkeit'),
+    beruf: getVal('Ausgeübte Tätigkeit'),
+    anrede: getVal('Anrede'),
   };
 }
 
@@ -173,7 +189,7 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
   const p1 = pages[0];
 
   // Personal data (Kunde column, EX=200)
-  draw(p1, EX, 128.4, v('kundennummer'));
+  draw(p1, EX, 108.0, v('kundennummer'));  // Kundennummer row y=107.1
   draw(p1, EX, 170.9, v('nachname'));
   draw(p1, EX, 192.1, v('vorname'));
   draw(p1, EX, 213.4, v('geburtsname'));
@@ -312,26 +328,28 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
   draw(p3, 383, 194.3, v('verb_buergschaften'));
   draw(p3, 383, 222.8, fmt(verbSum));
 
-  draw(p3, 65,  295.7, v('iban'));
-  draw(p3, 232, 295.7, v('bic'));
-  draw(p3, 440, 295.7, v('bank_seit'));
+  // Bank row: IBAN entry x=65 (label ends 61.8), BIC x=230 (label ends 227.6), seit x=450 (label ends 448.1)
+  draw(p3, 65,  295.7, v('iban'), 7);
+  draw(p3, 230, 295.7, v('bic'), 8);
+  draw(p3, 460, 295.7, v('bank_seit'), 8);
 
   draw(p3, 198, 370.3, v('ausweis_nr'));
   const ausstell = [v('ausstellungsbehoerde'), v('ausstellungsdatum'), v('gueltig_bis')].filter(Boolean).join(', ');
-  draw(p3, 400, 370.3, ausstell, 7);
+  draw(p3, 420, 370.3, ausstell, 7);
 
   // ── PAGE 4 ──────────────────────────────────────────────────────
   const p4 = pages[3];
-  draw(p4, 44, 546.5, new Date().toLocaleDateString('de-DE'));
+  // Datum weiter oben damit kein Überschreiben
+  draw(p4, 44, 530, new Date().toLocaleDateString('de-DE'));
 
-  // Signature
+  // Signature höher positioniert
   const sig = sa.signature;
   if (sig && sig.startsWith('data:image')) {
     try {
       const b64 = sig.split(',')[1];
       const sigBytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
       const sigImg = sig.includes('png') ? await pdfDoc.embedPng(sigBytes) : await pdfDoc.embedJpg(sigBytes);
-      p4.drawImage(sigImg, {x: 290, y: H-546.5-5, width: 120, height: 25});
+      p4.drawImage(sigImg, {x: 290, y: H-520, width: 130, height: 28});
     } catch(e) { console.warn('Sig:', e); }
   }
 
@@ -643,6 +661,33 @@ function MandantPage({mandantId}) {
   useEffect(()=>{ loadMandantData(mandantId).then(d=>{if(d)setData(d);}); },[mandantId]);
 
   if(!data)return <div className="app"><style>{CSS}</style><div style={{color:"var(--muted)",paddingTop:48}}>Lade…</div></div>;
+
+  const [pinOk,setPinOk]=useState(false);
+  const [pinInput,setPinInput]=useState('');
+  const [pinErr,setPinErr]=useState(false);
+  const storedPin = data?.pin || (mandanten && mandanten[mandantId]?.pin);
+
+  if(!pinOk){
+    return(
+      <div className="app"><style>{CSS}</style>
+        <div style={{maxWidth:320,margin:"80px auto",padding:"0 20px"}}>
+          <div className="hdr-sub">KS2 · Einwertungsprozess</div>
+          <div style={{fontFamily:"'DM Serif Display',serif",fontSize:26,marginBottom:20}}>Zugang<br/><em style={{fontStyle:"italic",color:"var(--accent)"}}>bestätigen</em></div>
+          <div style={{fontSize:12,color:"var(--muted)",marginBottom:16}}>Bitte gib den 5-stelligen PIN ein, den du von deinem Berater erhalten hast.</div>
+          <input className="ifield" type="number" placeholder="12345" value={pinInput}
+            onChange={e=>setPinInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&checkPin()}
+            style={{width:"100%",marginBottom:8,fontSize:20,textAlign:"center",letterSpacing:4,borderColor:pinErr?"var(--accent)":undefined}}/>
+          {pinErr&&<div style={{color:"var(--accent)",fontSize:11,marginBottom:8}}>Falscher PIN</div>}
+          <button className="btn" style={{width:"100%"}} onClick={checkPin}>Weiter →</button>
+        </div>
+      </div>
+    );
+  }
+
+  function checkPin(){
+    if(String(pinInput).trim()===String(storedPin)){setPinOk(true);}
+    else{setPinErr(true);setTimeout(()=>setPinErr(false),2000);}
+  }
 
   const {vorname,nachname,uploads={},selbstauskunft=null,crmData=null,adminData={}}=data;
   const fullName=`${vorname} ${nachname}`;
@@ -970,13 +1015,19 @@ function AdminPage(){
   async function handleCreate(){
     const t=name.trim();if(!t)return;
     const p=t.split(" ");const id=genId();
-    const nm={...mandanten,[id]:{vorname:p[0],nachname:p.slice(1).join(" "),createdAt:new Date().toISOString()}};
+    const pin = String(Math.floor(10000 + Math.random() * 90000));
+    const nm={...mandanten,[id]:{vorname:p[0],nachname:p.slice(1).join(" "),createdAt:new Date().toISOString(),pin}};
     await saveMandanten(nm);
-    await saveMandantData(id,{vorname:p[0],nachname:p.slice(1).join(" "),uploads:{},selbstauskunft:null,crmData:null,adminData:{}});
+    await saveMandantData(id,{vorname:p[0],nachname:p.slice(1).join(" "),uploads:{},selbstauskunft:null,crmData:null,adminData:{},pin});
     setMandanten(nm);setName("");setToast(`${t} angelegt ✓`);
   }
 
-  async function handleDelete(id){const nm={...mandanten};delete nm[id];await saveMandanten(nm);setMandanten(nm);}
+  async function handleDelete(id){
+    const m=mandanten[id];
+    if(!window.confirm(`Mandant "${m.vorname} ${m.nachname}" wirklich löschen? Alle Daten gehen verloren.`)) return;
+    const nm={...mandanten};delete nm[id];await saveMandanten(nm);setMandanten(nm);
+    setToast("Mandant gelöscht");
+  }
   function handleCopy(id){navigator.clipboard.writeText(genLink(id));setCopiedId(id);setTimeout(()=>setCopiedId(null),2000);}
 
   async function handleCRMUpload(id,file){
@@ -1096,6 +1147,7 @@ function AdminPage(){
                       </div>
                       <div style={{fontSize:11,color:"var(--muted)",marginTop:2}}>{getProgress(id)} Schritte</div>
                       <div className="link-s">{genLink(id)}</div>
+                      {m.pin&&<div style={{fontSize:12,marginTop:4,color:"var(--ok)",fontWeight:500}}>🔑 PIN für Mandant: <strong>{m.pin}</strong></div>}
                     </div>
                     <div className="m-acts">
                       <button className="btn btn-o btn-sm" onClick={()=>setExpandedId(exp?null:id)}>{exp?"▲":"Details ▼"}</button>
