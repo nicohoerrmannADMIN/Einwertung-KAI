@@ -232,7 +232,7 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
     checkX(p1, 203.0, 519.5);
     if (v('probezeit_bis')) draw(p1, 245, 519.5, v('probezeit_bis'));
   } else {
-    checkX(p1, 227.1, 519.5); // nein
+    checkX(p1, 232.1, 517.5); // nein (5pts right, 2pts up)
   }
 
   // Arbeitsverhältnis: unbefristet x0=202.9, befristet x0=251.1 -> y=540.8
@@ -278,9 +278,9 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
     const ky = kidYs[i-1];
     const kv = v(`kind${i}_vorname`);
     if (kv) {
-      draw(p2, 195, ky, kv, 7);
-      draw(p2, 330, ky, v(`kind${i}_name`), 7);
-      draw(p2, 500, ky, v(`kind${i}_geb`), 7);
+      draw(p2, 205, ky, kv, 7);   // Vorname 10pts right
+      draw(p2, 340, ky, v(`kind${i}_name`), 7);  // Name 10pts right
+      draw(p2, 500, ky, v(`kind${i}_geb`), 7);   // Geburtsdatum unchanged
     }
   }
 
@@ -306,7 +306,7 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
   draw(p2, 530, 431.1, v('ausg_pkv'));
   draw(p2, 530, 448.1, v('ausg_unterhalt'));
   draw(p2, 530, 465.1, v('ausg_sonstige'));
-  draw(p2, 520, 516.2, fmt(ausgSum));
+  draw(p2, 510, 516.2, fmt(ausgSum));
 
   // Rentenansprüche
   draw(p2, 530, 562, v('rente_gesetzlich'));
@@ -314,21 +314,21 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
 
   // ── PAGE 3 ──────────────────────────────────────────────────────
   const p3 = pages[2];
-  // Vermögen: each row has different label end, value goes between label and "/"
-  draw(p3, 66,  120,   v('verm_immobilien'));   // Haus/Grund: after multi-line label block
-  draw(p3, 66,  140.2, v('verm_bank'));          // Bank: label ends x=64
-  draw(p3, 84,  156.6, v('verm_wertpapiere'));   // Wertpapiere: label ends x=82
-  draw(p3, 94,  174.2, v('verm_bausparer'));     // Bausparer: label ends x=92
-  draw(p3, 116, 190.3, v('verm_versicherung')); // Versicherung: label ends x=114
-  draw(p3, 78,  214.3, v('verm_sonstiges'));     // Sonstiges: label ends x=76
-  draw(p3, 73,  231.3, fmt(vermSum));            // Gesamt: "/" at x=71
+  // Vermögen: value goes in 2nd column AFTER "davon einsetzen" text (after x=233)
+  draw(p3, 237, 120,   v('verm_immobilien'), 7);
+  draw(p3, 237, 140.2, v('verm_bank'), 7);
+  draw(p3, 237, 156.6, v('verm_wertpapiere'), 7);
+  draw(p3, 237, 174.2, v('verm_bausparer'), 7);
+  draw(p3, 237, 190.3, v('verm_versicherung'), 7);
+  draw(p3, 237, 214.3, v('verm_sonstiges'), 7);
+  draw(p3, 237, 231.3, fmt(vermSum), 7);
 
-  // Verbindlichkeiten: value goes after label end, right column
-  draw(p3, 430, 120,   v('verb_hypotheken'));    // Hypotheken: multi-line label
-  draw(p3, 354, 140.2, v('verb_kredite'));       // Bank/Privatkredite: label ends x=352
-  draw(p3, 378, 174.2, v('verb_sonstige'));      // Sonstige: label ends x=376
-  draw(p3, 383, 194.3, v('verb_buergschaften')); // Bürgschaften: label ends x=381
-  draw(p3, 430, 222.8, fmt(verbSum));            // Gesamt
+  // Verbindlichkeiten: value in right entry column after labels (~x=432)
+  draw(p3, 432, 120,   v('verb_hypotheken'), 7);
+  draw(p3, 432, 140.2, v('verb_kredite'), 7);
+  draw(p3, 432, 174.2, v('verb_sonstige'), 7);
+  draw(p3, 432, 194.3, v('verb_buergschaften'), 7);
+  draw(p3, 450, 222.8, fmt(verbSum), 7);         // Gesamt
 
   // Bank row: IBAN entry x=65 (label ends 61.8), BIC x=230 (label ends 227.6), seit x=450 (label ends 448.1)
   draw(p3, 65,  295.7, v('iban'), 7);
@@ -1207,34 +1207,58 @@ function AdminPage(){
 
                   {exp&&(
                     <div className="m-detail">
-                      <span className="lbl">Kundendaten (CRM)</span>
+                      <span className="lbl">Persönliche Daten</span>
                       <div className="grid2">
                         {[
-                          {key:"kundennummer",label:"Kundennummer"},
-                          {key:"vorname",label:"Vorname"},
-                          {key:"nachname",label:"Nachname"},
-                          {key:"geburtsdatum",label:"Geburtsdatum"},
-                          {key:"geburtsort",label:"Geburtsort"},
-                          {key:"geburtsname",label:"Geburtsname"},
-                          {key:"strasse",label:"Straße, Hausnr."},
-                          {key:"plz_ort",label:"PLZ, Ort"},
-                          {key:"wohnhaft_seit",label:"Wohnhaft seit"},
-                          {key:"telefon",label:"Telefon"},
-                          {key:"email",label:"E-Mail"},
-                          {key:"familienstand",label:"Familienstand"},
-                          {key:"staatsangehoerigkeit",label:"Staatsangehörigkeit"},
-                          {key:"beruf",label:"Ausgeübte Tätigkeit"},
+                          {key:"kundennummer",label:"Kundennummer",src:"crm"},
+                          {key:"vorname",label:"Vorname",src:"crm"},
+                          {key:"nachname",label:"Nachname",src:"crm"},
+                          {key:"geburtsdatum",label:"Geburtsdatum",src:"crm"},
+                          {key:"geburtsort",label:"Geburtsort",src:"admin"},
+                          {key:"geburtsname",label:"Geburtsname",src:"admin"},
+                          {key:"staatsangehoerigkeit",label:"Staatsangehörigkeit",src:"crm"},
+                          {key:"familienstand",label:"Familienstand",src:"crm"},
                         ].map(f=>(
                           <div key={f.key} className="fg">
                             <span className="lbl">{f.label}</span>
-                            <input className="ifield" value={d?.crmData?.[f.key]||""} onChange={e=>handleCRMField(id,f.key,e.target.value)} placeholder={f.label}/>
+                            <input className="ifield"
+                              value={f.src==="crm"?(d?.crmData?.[f.key]||""):(d?.adminData?.[f.key]||"")}
+                              onChange={e=>f.src==="crm"?handleCRMField(id,f.key,e.target.value):handleAdminField(id,f.key,e.target.value)}
+                              placeholder={f.label}/>
                           </div>
                         ))}
                       </div>
 
-                      <span className="lbl" style={{marginTop:14}}>Personalausweis-Daten (von Ausweis übertragen)</span>
+                      <span className="lbl" style={{marginTop:14}}>Adresse & Kontakt</span>
                       <div className="grid2">
-                        {adminFields.map(f=>(
+                        {[
+                          {key:"strasse",label:"Straße, Hausnr.",src:"crm"},
+                          {key:"plz_ort",label:"PLZ, Ort",src:"crm"},
+                          {key:"wohnhaft_seit",label:"Wohnhaft seit",src:"admin"},
+                          {key:"telefon",label:"Telefon",src:"crm"},
+                          {key:"email",label:"E-Mail",src:"crm"},
+                          {key:"beruf",label:"Ausgeübte Tätigkeit",src:"crm"},
+                        ].map(f=>(
+                          <div key={f.key} className="fg">
+                            <span className="lbl">{f.label}</span>
+                            <input className="ifield"
+                              value={f.src==="crm"?(d?.crmData?.[f.key]||""):(d?.adminData?.[f.key]||"")}
+                              onChange={e=>f.src==="crm"?handleCRMField(id,f.key,e.target.value):handleAdminField(id,f.key,e.target.value)}
+                              placeholder={f.label}/>
+                          </div>
+                        ))}
+                      </div>
+
+                      <span className="lbl" style={{marginTop:14}}>Ausweis & Bankverbindung</span>
+                      <div className="grid2">
+                        {[
+                          {key:"ausweis_nr",label:"Ausweis-Nr."},
+                          {key:"ausstellungsbehoerde",label:"Ausstellungsbehörde"},
+                          {key:"gueltig_bis",label:"Gültig bis"},
+                          {key:"iban",label:"IBAN"},
+                          {key:"bic",label:"BIC"},
+                          {key:"bank_seit",label:"Bankverbindung seit"},
+                        ].map(f=>(
                           <div key={f.key} className="fg">
                             <span className="lbl">{f.label}</span>
                             <input className="ifield" value={d?.adminData?.[f.key]||""} onChange={e=>handleAdminField(id,f.key,e.target.value)} placeholder={f.label}/>
