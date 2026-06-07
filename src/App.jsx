@@ -436,35 +436,44 @@ body{background:var(--paper);color:var(--ink);font-family:'DM Mono',monospace;fo
 .sign-foot{display:flex;justify-content:space-between;padding:8px 12px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);align-items:center}
 
 @media (max-width: 600px) {
-  body{font-size:15px}
-  .app{padding:24px 16px}
-  .hdr-title{font-size:24px}
-  .btn{padding:14px 18px;font-size:14px}
-  .btn-sm{padding:10px 14px;font-size:13px}
-  .ifield{padding:13px 14px;font-size:15px}
-  .upl-lbl{font-size:14px}
-  .upl-sub{font-size:12px}
-  .upl-hint{font-size:12px}
-  .upl-hdr{padding:16px 14px;gap:12px}
-  .file-row{font-size:13px;padding:6px 0}
-  .lbl{font-size:11px;margin-bottom:10px}
-  .badge{font-size:12px;padding:4px 10px}
-  .sa-q{font-size:20px}
-  .sa-hint{font-size:13px}
-  .sa-opt{padding:16px;font-size:15px}
-  .sa-num{font-size:20px;padding:16px}
-  .sum-box{font-size:14px;padding:12px 14px}
-  .consent-text{font-size:13px}
+  *{word-break:break-word;overflow-wrap:break-word;box-sizing:border-box}
+  body{font-size:14px}
+  .app{padding:20px 14px;max-width:100%}
+  .hdr-title{font-size:22px}
+  .btn{padding:13px 16px;font-size:13px;white-space:normal;text-align:center}
+  .btn-sm{padding:9px 12px;font-size:12px;white-space:normal}
+  .ifield{padding:12px 12px;font-size:14px;width:100%}
+  .upl-lbl{font-size:13px}
+  .upl-sub{font-size:11px}
+  .upl-hint{font-size:11px}
+  .upl-hdr{padding:14px 12px;gap:10px;flex-wrap:wrap}
+  .file-row{font-size:12px;padding:5px 0}
+  .file-row span{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis}
+  .lbl{font-size:10px;margin-bottom:8px}
+  .badge{font-size:11px;padding:3px 8px}
+  .sa-q{font-size:18px;line-height:1.3}
+  .sa-hint{font-size:12px}
+  .sa-opt{padding:14px 12px;font-size:13px;white-space:normal}
+  .sa-num{font-size:18px;padding:14px}
+  .sum-box{font-size:13px;padding:10px 12px}
+  .consent-text{font-size:12px;line-height:1.5}
   .grid2{grid-template-columns:1fr}
   .m-row{flex-direction:column}
-  .m-acts{width:100%;justify-content:flex-start}
-  .card{padding:18px}
-  .login-w{margin:40px auto}
-  .pg-hdr{font-size:12px}
-  .done-title{font-size:26px}
-  .done-sub{font-size:14px}
+  .m-acts{width:100%;justify-content:flex-start;flex-wrap:wrap}
+  .card{padding:16px}
+  .login-w{margin:40px auto;padding:0 16px}
+  .pg-hdr{font-size:11px}
+  .done-title{font-size:24px}
+  .done-sub{font-size:13px}
   .input-row{flex-direction:column}
   .input-row .btn{width:100%}
+  .upl-item{max-width:100%;overflow:hidden}
+  .hdr-sub{font-size:9px}
+  label.btn{display:block;text-align:center}
+  .m-acts .btn{flex:1;min-width:60px;text-align:center}
+  .consent-box{padding:12px}
+  .divider{margin:16px 0}
+  .file-list{padding:0 10px 8px 28px}
 }
 `;
 
@@ -513,7 +522,14 @@ function SAWizard({crmData, adminData, existing, onSave, onClose}) {
   const set = (k,v) => setVals(p=>({...p,[k]:v}));
 
   const steps = [];
-  steps.push({id:"berufsstatus",type:"choice",q:"Wie bist du aktuell beschäftigt?",opts:["Angestellter","Arbeiter","Beamter","öffentlicher Dienst","selbstständig","Rentner","arbeitslos"],key:"berufsstatus"});
+  steps.push({id:"berufsstatus",type:"choice",q:"Wie bist du aktuell beschäftigt?",opts:["Angestellter","Arbeiter","Beamter","öffentlicher Dienst","selbstständig","Rentner","arbeitslos"],key:"berufsstatus",
+    onSelect:(v,setVals)=>{
+      // Clear fields irrelevant for self-employed/retired/unemployed
+      if(["selbstständig","Rentner","arbeitslos"].includes(v)){
+        setVals(p=>({...p,berufsstatus:v,arbeitszeit:"",arbeitsverhaeltnis:"",befristet_bis:"",probezeit:"",probezeit_bis:"",arbeitgeber:"",beschaeftigt_seit:""}));
+      }
+    }
+  });
   if(!["selbstständig","Rentner","arbeitslos"].includes(vals.berufsstatus)){
     steps.push({id:"beruf_detail",type:"multi",q:"Dein Beruf & Arbeitgeber",fields:[
       {key:"berufsbezeichnung",label:"Berufsbezeichnung",placeholder:"z.B. Kaufmann/frau"},
@@ -964,7 +980,10 @@ function MandantPage({mandantId}) {
           <input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)}/>
           <span className="consent-text">
             <strong>Einwilligung zur Datenverarbeitung *</strong><br/>
-            Ich willige ein, dass meine personenbezogenen Daten ausschließlich zum Zweck der Immobilien-Einwertung und Finanzierungsvermittlung verarbeitet werden. Die Daten werden streng vertraulich behandelt, nicht an Dritte weitergegeben und nach Abschluss des Prozesses gemäß den gesetzlichen Aufbewahrungsfristen gelöscht. Rechtsgrundlage: Art. 6 Abs. 1 a) DS-GVO.
+            <strong style={{color:"var(--ok)",display:"block",margin:"8px 0 6px",fontSize:13}}>
+              ✦ Zugang zu exklusiven Objekten der Vorzugsliste – ausschließlich für eingewertete Mandanten
+            </strong>
+            Deine Angaben dienen ausschließlich der unverbindlichen Einwertung und der optimalen Zuordnung geeigneter Objekte aus unserer exklusiven Vorzugsliste. Eine Weitergabe an Dritte oder eine Nutzung zu anderen Zwecken findet nicht statt. Die Verarbeitung erfolgt vertraulich und wird nach Abschluss des Prozesses gemäß den gesetzlichen Aufbewahrungsfristen gelöscht. Rechtsgrundlage: Art. 6 Abs. 1 a) DS-GVO.
           </span>
         </label>
       </div>
