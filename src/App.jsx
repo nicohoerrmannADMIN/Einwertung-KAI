@@ -665,7 +665,7 @@ function MandantPage({mandantId}) {
   const [pinOk,setPinOk]=useState(false);
   const [pinInput,setPinInput]=useState('');
   const [pinErr,setPinErr]=useState(false);
-  const storedPin = data?.pin || (mandanten && mandanten[mandantId]?.pin);
+  const storedPin = data?.pin;
 
   if(!pinOk){
     return(
