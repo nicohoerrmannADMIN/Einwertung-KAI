@@ -230,7 +230,7 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
   const probe = v('probezeit').toLowerCase();
   if (probe === 'ja') {
     checkX(p1, 203.0, 519.5);
-    if (v('probezeit_bis')) draw(p1, 245, 519.5, v('probezeit_bis'));
+    if (v('probezeit_bis')) draw(p1, 253, 517.5, v('probezeit_bis')); // 8pts right, 2pts up
   } else {
     checkX(p1, 232.1, 517.5); // nein (5pts right, 2pts up)
   }
@@ -240,7 +240,7 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
   if (av.includes('unbefristet')) checkX(p1, 202.9, 540.8);
   else if (av.includes('befristet')) {
     checkX(p1, 251.1, 540.8);
-    if (v('befristet_bis')) draw(p1, 290, 540.8, 'bis ' + v('befristet_bis'));
+    if (v('befristet_bis')) draw(p1, 290, 538.8, 'bis ' + v('befristet_bis')); // 2pts up
   }
 
   // Berufsbezeichnung, Arbeitgeber, Beschäftigt seit, Selbstständig seit
@@ -278,8 +278,8 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
     const ky = kidYs[i-1];
     const kv = v(`kind${i}_vorname`);
     if (kv) {
-      draw(p2, 205, ky, kv, 7);   // Vorname 10pts right
-      draw(p2, 340, ky, v(`kind${i}_name`), 7);  // Name 10pts right
+      draw(p2, 207, ky, kv, 7);        // Vorname 12pts right total
+      draw(p2, 348, ky, v(`kind${i}_name`), 7);  // Name 8pts more right
       draw(p2, 500, ky, v(`kind${i}_geb`), 7);   // Geburtsdatum unchanged
     }
   }
@@ -306,7 +306,7 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
   draw(p2, 530, 431.1, v('ausg_pkv'));
   draw(p2, 530, 448.1, v('ausg_unterhalt'));
   draw(p2, 530, 465.1, v('ausg_sonstige'));
-  draw(p2, 510, 516.2, fmt(ausgSum));
+  draw(p2, 503, 516.2, fmt(ausgSum));
 
   // Rentenansprüche
   draw(p2, 530, 562, v('rente_gesetzlich'));
@@ -324,11 +324,11 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
   draw(p3, 237, 231.3, fmt(vermSum), 7);
 
   // Verbindlichkeiten: value in right entry column after labels (~x=432)
-  draw(p3, 432, 120,   v('verb_hypotheken'), 7);
-  draw(p3, 432, 140.2, v('verb_kredite'), 7);
-  draw(p3, 432, 174.2, v('verb_sonstige'), 7);
-  draw(p3, 432, 194.3, v('verb_buergschaften'), 7);
-  draw(p3, 450, 222.8, fmt(verbSum), 7);         // Gesamt
+  draw(p3, 442, 120,   v('verb_hypotheken'), 7);
+  draw(p3, 442, 140.2, v('verb_kredite'), 7);
+  draw(p3, 442, 174.2, v('verb_sonstige'), 7);
+  draw(p3, 442, 194.3, v('verb_buergschaften'), 7);
+  draw(p3, 457, 222.8, fmt(verbSum), 7);         // Gesamt
 
   // Bank row: IBAN entry x=65 (label ends 61.8), BIC x=230 (label ends 227.6), seit x=450 (label ends 448.1)
   draw(p3, 65,  295.7, v('iban'), 7);
