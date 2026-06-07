@@ -182,14 +182,14 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
 
   // Draw X in checkbox: checkbox is ~8pt square at x = labelX0 - 10
   function checkX(page, labelX0, structTop) {
-    page.drawText('X', {x: labelX0-9, y: H-structTop-7, size:7, font, color:rgb(0,0,0)});
+    page.drawText('X', {x: labelX0-9, y: H-structTop, size:7, font, color:rgb(0,0,0)});
   }
 
   // ── PAGE 1 ──────────────────────────────────────────────────────
   const p1 = pages[0];
 
   // Personal data (Kunde column, EX=200)
-  draw(p1, EX, 108.0, v('kundennummer'));  // Kundennummer row y=107.1
+  draw(p1, EX, 128.4, v('kundennummer'));  // One row lower (Titel row)
   draw(p1, EX, 170.9, v('nachname'));
   draw(p1, EX, 192.1, v('vorname'));
   draw(p1, EX, 213.4, v('geburtsname'));
@@ -470,7 +470,12 @@ function SigPad({onSave}) {
 
 // ── SA Wizard ────────────────────────────────────────────────────
 function SAWizard({crmData, adminData, existing, onSave, onClose}) {
-  const [vals, setVals] = useState(existing||{});
+  // Pre-fill from CRM data if available
+  const crmPrefill = crmData ? {
+    familienstand: crmData.familienstand || '',
+    beruf: crmData.beruf || '',
+  } : {};
+  const [vals, setVals] = useState({...crmPrefill, ...(existing||{})});
   const [step, setStep] = useState(0);
 
   const set = (k,v) => setVals(p=>({...p,[k]:v}));
@@ -622,7 +627,7 @@ function SAWizard({crmData, adminData, existing, onSave, onClose}) {
         <div className="sa-nav">
           <button className="btn btn-o btn-sm" onClick={back} disabled={step===0}>← Zurück</button>
           {isLast
-            ?<button className="btn btn-sm" disabled={!canNext()} onClick={()=>onSave({...vals})}>Speichern ✓</button>
+            ?<button className="btn btn-ok btn-sm" onClick={()=>{if(canNext())onSave({...vals});}}>Selbstauskunft speichern ✓</button>
             :<button className="btn btn-sm" disabled={!canNext()} onClick={next}>Weiter →</button>
           }
         </div>
@@ -943,6 +948,41 @@ function MandantPage({mandantId}) {
       <div className="divider"/>
       <span className="lbl">Dokumente herunterladen</span>
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {/* Download ALL button */}
+        <button className="btn btn-ok" style={{width:"100%"}} onClick={async()=>{
+          let count=0;
+          if(selbstauskunft){
+            try{
+              const bytes=await generateSAPDF(selbstauskunft,adminData,crmData,fullName);
+              const blob=new Blob([bytes],{type:'application/pdf'});
+              const url=URL.createObjectURL(blob);
+              const a=document.createElement('a');
+              a.href=url;a.download=`Selbstauskunft_${fullName}.pdf`;
+              document.body.appendChild(a);a.click();
+              document.body.removeChild(a);URL.revokeObjectURL(url);
+              count++;
+            }catch(e){setToast("SA-PDF Fehler");}
+          }
+          Object.values(uploads).forEach(files=>{
+            if(!Array.isArray(files))return;
+            files.forEach((f)=>{
+              if(!f.b64)return;
+              setTimeout(()=>{
+                const blob=base64ToBlob(f.b64);
+                const url=URL.createObjectURL(blob);
+                const a=document.createElement('a');
+                a.href=url;a.download=f.name;
+                document.body.appendChild(a);a.click();
+                document.body.removeChild(a);URL.revokeObjectURL(url);
+              },count*400);
+              count++;
+            });
+          });
+          if(count>0)setToast(`${count} Datei(en) werden heruntergeladen`);
+          else setToast("Keine Dateien vorhanden");
+        }}>
+          ⬇ Alle Unterlagen herunterladen
+        </button>
         {selbstauskunft&&(
           <button className="btn btn-o" style={{width:"100%",textAlign:"left"}} onClick={handleDownloadSA}>
             📄 Selbstauskunft (PDF)
@@ -958,10 +998,10 @@ function MandantPage({mandantId}) {
           );
           return files.map((f,i)=>(
             <button key={`${dok.id}_${i}`} className="btn btn-o" style={{width:"100%",textAlign:"left"}} onClick={()=>{
-              if(!f.b64){setToast("Datei nicht mehr verfügbar");return;}
+              if(!f.b64){setToast("Datei nicht verfügbar");return;}
               const blob=base64ToBlob(f.b64);
               const url=URL.createObjectURL(blob);
-              const a=document.createElement("a");
+              const a=document.createElement('a');
               a.href=url;a.download=f.name;
               document.body.appendChild(a);a.click();
               document.body.removeChild(a);URL.revokeObjectURL(url);
@@ -971,7 +1011,6 @@ function MandantPage({mandantId}) {
           ));
         })}
       </div>
-
       {showSA&&<SAWizard crmData={crmData} adminData={adminData} existing={selbstauskunft} onSave={handleSaveSA} onClose={()=>setShowSA(false)}/>}
       {toast&&<Toast msg={toast} onDone={()=>setToast(null)}/>}
     </div>
