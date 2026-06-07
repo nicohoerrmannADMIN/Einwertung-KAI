@@ -314,24 +314,26 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
 
   // ── PAGE 3 ──────────────────────────────────────────────────────
   const p3 = pages[2];
-  draw(p3, 170, 120,   v('verm_immobilien'));
-  draw(p3, 170, 140.2, v('verm_bank'));
-  draw(p3, 170, 156.6, v('verm_wertpapiere'));
-  draw(p3, 170, 174.2, v('verm_bausparer'));
-  draw(p3, 170, 190.3, v('verm_versicherung'));
-  draw(p3, 170, 214.3, v('verm_sonstiges'));
-  draw(p3, 170, 231.3, fmt(vermSum));
+  // Vermögen: each row has different label end, value goes between label and "/"
+  draw(p3, 66,  120,   v('verm_immobilien'));   // Haus/Grund: after multi-line label block
+  draw(p3, 66,  140.2, v('verm_bank'));          // Bank: label ends x=64
+  draw(p3, 84,  156.6, v('verm_wertpapiere'));   // Wertpapiere: label ends x=82
+  draw(p3, 94,  174.2, v('verm_bausparer'));     // Bausparer: label ends x=92
+  draw(p3, 116, 190.3, v('verm_versicherung')); // Versicherung: label ends x=114
+  draw(p3, 78,  214.3, v('verm_sonstiges'));     // Sonstiges: label ends x=76
+  draw(p3, 73,  231.3, fmt(vermSum));            // Gesamt: "/" at x=71
 
-  draw(p3, 383, 120,   v('verb_hypotheken'));
-  draw(p3, 383, 140.2, v('verb_kredite'));
-  draw(p3, 383, 174.2, v('verb_sonstige'));
-  draw(p3, 383, 194.3, v('verb_buergschaften'));
-  draw(p3, 383, 222.8, fmt(verbSum));
+  // Verbindlichkeiten: value goes after label end, right column
+  draw(p3, 430, 120,   v('verb_hypotheken'));    // Hypotheken: multi-line label
+  draw(p3, 354, 140.2, v('verb_kredite'));       // Bank/Privatkredite: label ends x=352
+  draw(p3, 378, 174.2, v('verb_sonstige'));      // Sonstige: label ends x=376
+  draw(p3, 383, 194.3, v('verb_buergschaften')); // Bürgschaften: label ends x=381
+  draw(p3, 430, 222.8, fmt(verbSum));            // Gesamt
 
   // Bank row: IBAN entry x=65 (label ends 61.8), BIC x=230 (label ends 227.6), seit x=450 (label ends 448.1)
   draw(p3, 65,  295.7, v('iban'), 7);
   draw(p3, 230, 295.7, v('bic'), 8);
-  draw(p3, 460, 295.7, v('bank_seit'), 8);
+  draw(p3, 452, 295.7, v('bank_seit'), 8);
 
   draw(p3, 198, 370.3, v('ausweis_nr'));
   const ausstell = [v('ausstellungsbehoerde'), v('ausstellungsdatum'), v('gueltig_bis')].filter(Boolean).join(', ');
@@ -1067,6 +1069,12 @@ function AdminPage(){
     setToast(`CRM importiert ✓ – ${parsed.vorname} ${parsed.nachname}, Kd-Nr. ${parsed.kundennummer}`);
   }
 
+  async function handleCRMField(id,key,value){
+    const d=await loadMandantData(id);
+    const nd={...d,crmData:{...(d.crmData||{}),[key]:value}};
+    await saveMandantData(id,nd);setDetails(p=>({...p,[id]:nd}));
+  }
+
   async function handleAdminField(id,key,value){
     const d=await loadMandantData(id);
     const nd={...d,adminData:{...(d.adminData||{}),[key]:value}};
@@ -1130,7 +1138,7 @@ function AdminPage(){
         <>
           <span className="lbl">Aktive Mandanten</span>
           <div className="m-list">
-            {Object.entries(mandanten).map(([id,m])=>{
+            {Object.entries(mandanten).sort((a,b)=>new Date(b[1].createdAt)-new Date(a[1].createdAt)).map(([id,m])=>{
               const d=details[id];const exp=expandedId===id;
               return(
                 <div key={id} className="m-item">
@@ -1161,16 +1169,30 @@ function AdminPage(){
 
                   {exp&&(
                     <div className="m-detail">
-                      <span className="lbl">CRM-Import</span>
-                      <label className="btn btn-o btn-sm" style={{cursor:"pointer",display:"inline-block",marginBottom:10}}>
-                        📂 CRM-Datei (.txt)
-                        <input type="file" className="file-in" accept=".txt,.pdf" onChange={e=>handleCRMUpload(id,e.target.files[0])}/>
-                      </label>
-                      {d?.crmData&&<div style={{fontSize:11,color:"var(--ok)",marginBottom:12,lineHeight:1.8}}>
-                        ✓ <strong>{d.crmData.vorname} {d.crmData.nachname}</strong> · Kd-Nr. {d.crmData.kundennummer}<br/>
-                        {d.crmData.strasse}, {d.crmData.plz_ort}<br/>
-                        {d.crmData.telefon} · {d.crmData.email}
-                      </div>}
+                      <span className="lbl">Kundendaten (CRM)</span>
+                      <div className="grid2">
+                        {[
+                          {key:"kundennummer",label:"Kundennummer"},
+                          {key:"vorname",label:"Vorname"},
+                          {key:"nachname",label:"Nachname"},
+                          {key:"geburtsdatum",label:"Geburtsdatum"},
+                          {key:"geburtsort",label:"Geburtsort"},
+                          {key:"geburtsname",label:"Geburtsname"},
+                          {key:"strasse",label:"Straße, Hausnr."},
+                          {key:"plz_ort",label:"PLZ, Ort"},
+                          {key:"wohnhaft_seit",label:"Wohnhaft seit"},
+                          {key:"telefon",label:"Telefon"},
+                          {key:"email",label:"E-Mail"},
+                          {key:"familienstand",label:"Familienstand"},
+                          {key:"staatsangehoerigkeit",label:"Staatsangehörigkeit"},
+                          {key:"beruf",label:"Ausgeübte Tätigkeit"},
+                        ].map(f=>(
+                          <div key={f.key} className="fg">
+                            <span className="lbl">{f.label}</span>
+                            <input className="ifield" value={d?.crmData?.[f.key]||""} onChange={e=>handleCRMField(id,f.key,e.target.value)} placeholder={f.label}/>
+                          </div>
+                        ))}
+                      </div>
 
                       <span className="lbl" style={{marginTop:14}}>Personalausweis-Daten (von Ausweis übertragen)</span>
                       <div className="grid2">
