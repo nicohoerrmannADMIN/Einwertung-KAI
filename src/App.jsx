@@ -470,7 +470,7 @@ function SigPad({onSave}) {
 function SAWizard({crmData, adminData, existing, onSave, onClose}) {
   const [vals, setVals] = useState(existing||{});
   const [step, setStep] = useState(0);
-  const [sig, setSig] = useState(existing?.signature||null);
+
   const set = (k,v) => setVals(p=>({...p,[k]:v}));
 
   const steps = [];
@@ -542,7 +542,7 @@ function SAWizard({crmData, adminData, existing, onSave, onClose}) {
     {key:"verb_sonstige",label:"Sonstige Verbindlichkeiten",placeholder:"0"},
     {key:"verb_buergschaften",label:"Übernommene Bürgschaften",placeholder:"0"},
   ],sumKeys:["verb_hypotheken","verb_kredite","verb_sonstige","verb_buergschaften"]});
-  steps.push({id:"unterschrift",type:"signature",q:"Unterschrift",hint:"Bitte unterschreibe zur Bestätigung deiner Angaben."});
+
 
   const cur = steps[step]||steps[steps.length-1];
   const total = steps.length;
@@ -554,7 +554,7 @@ function SAWizard({crmData, adminData, existing, onSave, onClose}) {
     if(cur.type==="text")return!!(vals[cur.key]||"").trim();
     if(cur.type==="multi")return cur.fields.every(f=>!!(vals[f.key]||"").trim());
     if(cur.type==="sumFields")return true;
-    if(cur.type==="signature")return!!sig;
+
     return true;
   }
   function computeSum(keys){return keys.reduce((a,k)=>a+euros(vals[k]||"0"),0);}
@@ -615,21 +615,12 @@ function SAWizard({crmData, adminData, existing, onSave, onClose}) {
             </div>
           </div>
         )}
-        {cur.type==="signature"&&(
-          <div>
-            <div className="sa-q">{cur.q}</div>
-            <div className="sa-hint">{cur.hint}</div>
-            {sig?<div style={{marginBottom:12}}>
-              <img src={sig} alt="Unterschrift" style={{maxWidth:280,border:"1px solid var(--line)"}}/>
-              <br/><button className="btn btn-o btn-sm" style={{marginTop:8}} onClick={()=>setSig(null)}>Neu unterschreiben</button>
-            </div>:<SigPad onSave={setSig}/>}
-          </div>
-        )}
+
 
         <div className="sa-nav">
           <button className="btn btn-o btn-sm" onClick={back} disabled={step===0}>← Zurück</button>
           {isLast
-            ?<button className="btn btn-sm" disabled={!canNext()} onClick={()=>onSave({...vals,signature:sig})}>Speichern ✓</button>
+            ?<button className="btn btn-sm" disabled={!canNext()} onClick={()=>onSave({...vals})}>Speichern ✓</button>
             :<button className="btn btn-sm" disabled={!canNext()} onClick={next}>Weiter →</button>
           }
         </div>
@@ -849,12 +840,15 @@ function MandantPage({mandantId}) {
       {DOCS.map(dok=>{
         const files=uploads[dok.id]??[];
         const noDoc=!!uploads[`${dok.id}_nodoc`];
-        const ok=files.length>0||noDoc;
+        const already=!!uploads[`${dok.id}_already`];
+        const ok=files.length>0||noDoc||already;
+        const bgColor = ok ? "var(--ok-bg)" : "var(--paper)";
+        const borderColor = ok ? "var(--ok)" : "var(--line)";
         return(
-          <div key={dok.id} className={`upl-item${ok?" ok":""}`}>
+          <div key={dok.id} style={{border:`1px solid ${borderColor}`,background:bgColor,marginBottom:8,transition:"all 0.3s"}}>
             <div className="upl-hdr">
               <div style={{display:"flex",alignItems:"center",gap:10}}>
-                <div className="upl-dot"/>
+                <div className="upl-dot" style={{background:ok?"var(--ok)":"var(--line)"}}/>
                 <div>
                   <div className="upl-lbl">{dok.label}{dok.required&&<span style={{color:"var(--accent)",marginLeft:4}}>*</span>}</div>
                   <div className="upl-sub">{dok.sublabel}</div>
@@ -863,9 +857,9 @@ function MandantPage({mandantId}) {
               </div>
               <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
                 {ok&&<span className="badge badge-ok">✓</span>}
-                {!noDoc&&(
+                {!noDoc&&!already&&(
                   <label className="btn btn-o btn-sm" style={{cursor:"pointer"}}>
-                    {dok.camera?"📷 Foto/Upload":"Hochladen"}
+                    {files.length>0?"+ Weitere hochladen":dok.camera?"📷 Foto/Upload":"Hochladen"}
                     <input type="file" className="file-in" multiple accept="image/*,application/pdf" capture={dok.camera?"environment":undefined} onChange={e=>handleUpload(dok.id,e.target.files)}/>
                   </label>
                 )}
@@ -882,14 +876,14 @@ function MandantPage({mandantId}) {
                 <button className="btn btn-del btn-sm" onClick={()=>handleUndoNoDoc(dok.id)}>Rückgängig</button>
               </div>
             )}
-            {dok.canHaveAlready&&!uploads[`${dok.id}_already`]&&files.length===0&&!noDoc&&(
+            {dok.canHaveAlready&&!already&&files.length===0&&!noDoc&&(
               <div style={{padding:"0 14px 12px 32px"}}>
                 <button className="btn btn-o btn-sm" style={{color:"var(--ok)",borderColor:"var(--ok)"}} onClick={()=>handleAlreadyHave(dok.id)}>☐ Bereits vorhanden – liegt bei uns vor</button>
               </div>
             )}
-            {uploads[`${dok.id}_already`]&&(
+            {already&&(
               <div style={{padding:"0 14px 12px 32px",display:"flex",alignItems:"center",gap:8}}>
-                <span style={{fontSize:11,color:"var(--ok)"}}>☑ Bereits vorhanden – liegt bei uns vor</span>
+                <span style={{fontSize:12,color:"var(--ok)",fontWeight:500}}>✓ Bereits vorhanden – liegt bei uns vor</span>
                 <button className="btn btn-del btn-sm" onClick={()=>handleUndoAlready(dok.id)}>Rückgängig</button>
               </div>
             )}
@@ -897,8 +891,11 @@ function MandantPage({mandantId}) {
               <div className="file-list">
                 {files.map((f,i)=>(
                   <div key={i} className="file-row">
-                    <span>📄 {f.name}</span>
-                    <button className="btn btn-del btn-sm" onClick={()=>handleRemove(dok.id,i)}>Entfernen</button>
+                    <span style={{display:"flex",alignItems:"center",gap:6}}>
+                      <span>📄</span>
+                      <span style={{fontSize:11}}>{f.name}</span>
+                    </span>
+                    <button className="btn btn-del btn-sm" onClick={()=>handleRemove(dok.id,i)}>×</button>
                   </div>
                 ))}
               </div>
