@@ -434,6 +434,38 @@ body{background:var(--paper);color:var(--ink);font-family:'DM Mono',monospace;fo
 .sign-wrap{border:1px solid var(--line);background:white}
 .sign-canvas{display:block;cursor:crosshair;touch-action:none;width:100%;max-width:500px}
 .sign-foot{display:flex;justify-content:space-between;padding:8px 12px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);align-items:center}
+
+@media (max-width: 600px) {
+  body{font-size:15px}
+  .app{padding:24px 16px}
+  .hdr-title{font-size:24px}
+  .btn{padding:14px 18px;font-size:14px}
+  .btn-sm{padding:10px 14px;font-size:13px}
+  .ifield{padding:13px 14px;font-size:15px}
+  .upl-lbl{font-size:14px}
+  .upl-sub{font-size:12px}
+  .upl-hint{font-size:12px}
+  .upl-hdr{padding:16px 14px;gap:12px}
+  .file-row{font-size:13px;padding:6px 0}
+  .lbl{font-size:11px;margin-bottom:10px}
+  .badge{font-size:12px;padding:4px 10px}
+  .sa-q{font-size:20px}
+  .sa-hint{font-size:13px}
+  .sa-opt{padding:16px;font-size:15px}
+  .sa-num{font-size:20px;padding:16px}
+  .sum-box{font-size:14px;padding:12px 14px}
+  .consent-text{font-size:13px}
+  .grid2{grid-template-columns:1fr}
+  .m-row{flex-direction:column}
+  .m-acts{width:100%;justify-content:flex-start}
+  .card{padding:18px}
+  .login-w{margin:40px auto}
+  .pg-hdr{font-size:12px}
+  .done-title{font-size:26px}
+  .done-sub{font-size:14px}
+  .input-row{flex-direction:column}
+  .input-row .btn{width:100%}
+}
 `;
 
 // ── Toast ────────────────────────────────────────────────────────
