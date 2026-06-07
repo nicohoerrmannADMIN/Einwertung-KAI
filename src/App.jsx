@@ -655,19 +655,22 @@ function MandantPage({mandantId}) {
   const [toast,setToast]=useState(null);
   const [uploading,setUploading]=useState(false);
   const [done,setDone]=useState(false);
+  const [pinOk,setPinOk]=useState(false);
+  const [pinInput,setPinInput]=useState('');
+  const [pinErr,setPinErr]=useState(false);
   // Store actual File objects separately (not persisted)
   const fileCache = useRef({});
 
   useEffect(()=>{ loadMandantData(mandantId).then(d=>{if(d)setData(d);}); },[mandantId]);
 
-  if(!data)return <div className="app"><style>{CSS}</style><div style={{color:"var(--muted)",paddingTop:48}}>Lade…</div></div>;
-
-  const [pinOk,setPinOk]=useState(false);
-  const [pinInput,setPinInput]=useState('');
-  const [pinErr,setPinErr]=useState(false);
   const storedPin = data?.pin;
 
-  if(!pinOk){
+  function checkPin(){
+    if(String(pinInput).trim()===String(storedPin)){setPinOk(true);}
+    else{setPinErr(true);setTimeout(()=>setPinErr(false),2000);}
+  }
+
+  if(data && storedPin && !pinOk){
     return(
       <div className="app"><style>{CSS}</style>
         <div style={{maxWidth:320,margin:"80px auto",padding:"0 20px"}}>
@@ -684,10 +687,7 @@ function MandantPage({mandantId}) {
     );
   }
 
-  function checkPin(){
-    if(String(pinInput).trim()===String(storedPin)){setPinOk(true);}
-    else{setPinErr(true);setTimeout(()=>setPinErr(false),2000);}
-  }
+  if(!data)return <div className="app"><style>{CSS}</style><div style={{color:"var(--muted)",paddingTop:48}}>Lade…</div></div>;
 
   const {vorname,nachname,uploads={},selbstauskunft=null,crmData=null,adminData={}}=data;
   const fullName=`${vorname} ${nachname}`;
