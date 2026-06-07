@@ -182,7 +182,7 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
 
   // Draw X in checkbox: checkbox is ~8pt square at x = labelX0 - 10
   function checkX(page, labelX0, structTop) {
-    page.drawText('X', {x: labelX0-9, y: H-structTop, size:7, font, color:rgb(0,0,0)});
+    page.drawText('X', {x: labelX0-11, y: H-structTop-3, size:7, font, color:rgb(0,0,0)});
   }
 
   // ── PAGE 1 ──────────────────────────────────────────────────────
@@ -306,7 +306,7 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
   draw(p2, 530, 431.1, v('ausg_pkv'));
   draw(p2, 530, 448.1, v('ausg_unterhalt'));
   draw(p2, 530, 465.1, v('ausg_sonstige'));
-  draw(p2, 530, 516.2, fmt(ausgSum));
+  draw(p2, 520, 516.2, fmt(ausgSum));
 
   // Rentenansprüche
   draw(p2, 530, 562, v('rente_gesetzlich'));
@@ -336,7 +336,7 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
   draw(p3, 452, 295.7, v('bank_seit'), 8);
 
   draw(p3, 198, 370.3, v('ausweis_nr'));
-  const ausstell = [v('ausstellungsbehoerde'), v('ausstellungsdatum'), v('gueltig_bis')].filter(Boolean).join(', ');
+  const ausstell = [v('ausstellungsbehoerde'), v('gueltig_bis')].filter(Boolean).join(', ');
   draw(p3, 420, 370.3, ausstell, 7);
 
   // ── PAGE 4 ──────────────────────────────────────────────────────
@@ -1146,7 +1146,6 @@ function AdminPage(){
   const adminFields=[
     {key:"ausweis_nr",label:"Ausweis-Nr."},
     {key:"ausstellungsbehoerde",label:"Ausstellungsbehörde"},
-    {key:"ausstellungsdatum",label:"Ausstellungsdatum"},
     {key:"gueltig_bis",label:"Gültig bis"},
     {key:"geburtsort",label:"Geburtsort"},
     {key:"geburtsname",label:"Geburtsname"},
