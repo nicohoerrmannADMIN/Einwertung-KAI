@@ -318,13 +318,13 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
   // ── PAGE 3 ──────────────────────────────────────────────────────
   const p3 = pages[2];
   // Vermögen: value goes in 2nd column AFTER "davon einsetzen" text (after x=233)
-  draw(p3, 205, 130,   v('verm_immobilien'), 7);  // aligned with other verm rows
+  draw(p3, 205, 123,   v('verm_immobilien'), 7);  // 7pts up
   draw(p3, 205, 140.2, v('verm_bank'), 7);
   draw(p3, 205, 156.6, v('verm_wertpapiere'), 7);
   draw(p3, 205, 174.2, v('verm_bausparer'), 7);
   draw(p3, 205, 190.3, v('verm_versicherung'), 7);
   draw(p3, 205, 214.3, v('verm_sonstiges'), 7);
-  draw(p3, 200, 231.3, fmt(vermSum), 7);
+  draw(p3, 195, 231.3, fmt(vermSum), 7);
 
   // Verbindlichkeiten: value in right entry column after labels (~x=432)
   draw(p3, 460, 120,   v('verb_hypotheken'), 7);
@@ -600,6 +600,7 @@ function SAWizard({crmData, adminData, existing, onSave, onClose}) {
     {key:"verb_sonstige",label:"Sonstige Verbindlichkeiten",placeholder:"0"},
     {key:"verb_buergschaften",label:"Übernommene Bürgschaften",placeholder:"0"},
   ],sumKeys:["verb_hypotheken","verb_kredite","verb_sonstige","verb_buergschaften"]});
+  steps.push({id:"fertig",type:"done",q:"Alles ausgefüllt!",hint:"Deine Angaben sind vollständig. Klicke auf Speichern um die Selbstauskunft abzuschließen."});
 
 
   const cur = steps[step]||steps[steps.length-1];
@@ -612,6 +613,7 @@ function SAWizard({crmData, adminData, existing, onSave, onClose}) {
     if(cur.type==="text")return!!(vals[cur.key]||"").trim();
     if(cur.type==="multi")return cur.fields.every(f=>!!(vals[f.key]||"").trim());
     if(cur.type==="sumFields")return true;
+    if(cur.type==="done")return true;
 
     return true;
   }
@@ -657,6 +659,13 @@ function SAWizard({crmData, adminData, existing, onSave, onClose}) {
             ))}
           </div>
         )}
+        {cur.type==="done"&&(
+          <div style={{textAlign:"center",padding:"20px 0"}}>
+            <div style={{fontSize:48,marginBottom:16}}>✓</div>
+            <div className="sa-q">{cur.q}</div>
+            <div className="sa-hint" style={{marginTop:8}}>{cur.hint}</div>
+          </div>
+        )}
         {cur.type==="sumFields"&&(
           <div>
             <div className="sa-q">{cur.q}</div>
@@ -678,7 +687,7 @@ function SAWizard({crmData, adminData, existing, onSave, onClose}) {
         <div className="sa-nav">
           <button className="btn btn-o btn-sm" onClick={back} disabled={step===0}>← Zurück</button>
           {isLast
-            ?<button className="btn btn-ok btn-sm" onClick={()=>onSave({...vals})}>Selbstauskunft speichern ✓</button>
+            ?<button className="btn btn-ok" style={{padding:"14px 24px",fontSize:14}} onClick={()=>onSave({...vals})}>Selbstauskunft speichern & schließen ✓</button>
             :<button className="btn btn-sm" disabled={!canNext()} onClick={next}>Weiter →</button>
           }
         </div>
@@ -984,11 +993,13 @@ function MandantPage({mandantId}) {
         <label className="consent-row">
           <input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)}/>
           <span className="consent-text">
-            <strong>Einwilligung zur Datenverarbeitung *</strong><br/>
+            <strong>Einwilligung zur Datenverarbeitung *</strong>
             <strong style={{color:"var(--ok)",display:"block",margin:"8px 0 6px",fontSize:13}}>
-              ✦ Zugang zu exklusiven Objekten der Vorzugsliste – ausschließlich für eingewertete Mandanten
+              ✦ Unverbindliche Einwertung für den Zugang zu exklusiven Immobilienangeboten
             </strong>
-            Deine Angaben dienen ausschließlich der unverbindlichen Einwertung und der optimalen Zuordnung geeigneter Objekte aus unserer exklusiven Vorzugsliste. Eine Weitergabe an Dritte oder eine Nutzung zu anderen Zwecken findet nicht statt. Die Verarbeitung erfolgt vertraulich und wird nach Abschluss des Prozesses gemäß den gesetzlichen Aufbewahrungsfristen gelöscht. Rechtsgrundlage: Art. 6 Abs. 1 a) DS-GVO.
+            Die von dir angegebenen Daten werden ausschließlich dafür verwendet, eine unverbindliche Einwertung deiner finanziellen Möglichkeiten vorzunehmen. Diese Einwertung ist notwendig, um festzustellen, ob und welche Immobilienangebote aus unserer exklusiven Vorzugsliste für dich grundsätzlich infrage kommen und dir überhaupt zugesendet bzw. vorgestellt werden dürfen.<br/><br/>
+            Deine Daten werden nicht für Werbung genutzt, nicht verkauft und nicht an unbeteiligte Dritte weitergegeben. Sie dienen ausschließlich der Einwertung und der eventuellen Zuordnung passender Immobilienangebote. Die Verarbeitung erfolgt vertraulich gemäß den gesetzlichen Datenschutzbestimmungen.<br/><br/>
+            <em>Rechtsgrundlage: Art. 6 Abs. 1 lit. a DSGVO (Einwilligung). Du kannst deine Einwilligung jederzeit mit Wirkung für die Zukunft widerrufen.</em>
           </span>
         </label>
       </div>
