@@ -281,7 +281,7 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
     const ky = kidYs[i-1];
     const kv = v(`kind${i}_vorname`);
     if (kv) {
-      draw(p2, 233, ky, kv, 7);        // Vorname
+      draw(p2, 241, ky, kv, 7);        // Vorname
       draw(p2, 348, ky, v(`kind${i}_name`), 7);  // Name 8pts more right
       draw(p2, 500, ky, v(`kind${i}_geb`), 7);   // Geburtsdatum unchanged
     }
@@ -319,12 +319,12 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
   const p3 = pages[2];
   // Vermögen: value goes in 2nd column AFTER "davon einsetzen" text (after x=233)
   draw(p3, 217, 120,   v('verm_immobilien'), 7);
-  draw(p3, 217, 140.2, v('verm_bank'), 7);
-  draw(p3, 217, 156.6, v('verm_wertpapiere'), 7);
-  draw(p3, 217, 174.2, v('verm_bausparer'), 7);
-  draw(p3, 217, 190.3, v('verm_versicherung'), 7);
-  draw(p3, 217, 214.3, v('verm_sonstiges'), 7);
-  draw(p3, 217, 231.3, fmt(vermSum), 7);
+  draw(p3, 205, 140.2, v('verm_bank'), 7);
+  draw(p3, 205, 156.6, v('verm_wertpapiere'), 7);
+  draw(p3, 205, 174.2, v('verm_bausparer'), 7);
+  draw(p3, 205, 190.3, v('verm_versicherung'), 7);
+  draw(p3, 205, 214.3, v('verm_sonstiges'), 7);
+  draw(p3, 205, 231.3, fmt(vermSum), 7);
 
   // Verbindlichkeiten: value in right entry column after labels (~x=432)
   draw(p3, 460, 120,   v('verb_hypotheken'), 7);
