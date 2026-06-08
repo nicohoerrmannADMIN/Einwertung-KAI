@@ -8,9 +8,7 @@ export default function Landing() {
   const [auth, setAuth] = useState(!!sessionStorage.getItem("landing_auth"));
   const [pw, setPw] = useState("");
   const [error, setError] = useState(false);
-
-  const params = new URLSearchParams(window.location.search);
-  const view = params.get("view");
+  const [view, setView] = useState(sessionStorage.getItem("landing_view") || null);
 
   function check() {
     if (pw === PASSWORD) {
@@ -21,13 +19,18 @@ export default function Landing() {
     }
   }
 
+  function goTo(v) {
+    sessionStorage.setItem("landing_view", v);
+    setView(v);
+  }
+
   if (auth && view === "einwertung") return <App />;
   if (auth && view === "planung") return <Planung />;
 
   if (!auth) return (
-    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"#0a0f1e",gap:20}}>
+    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"#0a0f1e",gap:20,fontFamily:"sans-serif"}}>
       <div style={{color:"#c8a96e",fontSize:11,letterSpacing:"0.2em",textTransform:"uppercase"}}>Projekt 1030</div>
-      <div style={{color:"#f0ece4",fontFamily:"serif",fontSize:28}}>Startseite</div>
+      <div style={{color:"#f0ece4",fontSize:28}}>Startseite</div>
       <input
         type="password"
         placeholder="Passwort"
@@ -44,16 +47,16 @@ export default function Landing() {
   );
 
   return (
-    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"#0a0f1e",gap:32}}>
+    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"#0a0f1e",gap:32,fontFamily:"sans-serif"}}>
       <div style={{color:"#c8a96e",fontSize:11,letterSpacing:"0.2em",textTransform:"uppercase"}}>Projekt 1030</div>
-      <div style={{color:"#f0ece4",fontFamily:"serif",fontSize:32}}>Was möchtest du öffnen?</div>
+      <div style={{color:"#f0ece4",fontSize:32}}>Was möchtest du öffnen?</div>
       <div style={{display:"flex",gap:20}}>
-        <button onClick={() => window.location.href="?view=einwertung"} style={{background:"#1a2236",border:"1px solid rgba(200,169,110,0.3)",color:"#f0ece4",padding:"24px 40px",borderRadius:6,cursor:"pointer",fontSize:16,display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>
+        <button onClick={() => goTo("einwertung")} style={{background:"#1a2236",border:"1px solid rgba(200,169,110,0.3)",color:"#f0ece4",padding:"24px 40px",borderRadius:6,cursor:"pointer",fontSize:16,display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>
           <span style={{fontSize:32}}>🏠</span>
           <span style={{color:"#c8a96e",fontWeight:600}}>Einwertung</span>
           <span style={{fontSize:12,color:"#8892a0"}}>Immobilien Einwertung</span>
         </button>
-        <button onClick={() => window.location.href="?view=planung"} style={{background:"#1a2236",border:"1px solid rgba(200,169,110,0.3)",color:"#f0ece4",padding:"24px 40px",borderRadius:6,cursor:"pointer",fontSize:16,display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>
+        <button onClick={() => goTo("planung")} style={{background:"#1a2236",border:"1px solid rgba(200,169,110,0.3)",color:"#f0ece4",padding:"24px 40px",borderRadius:6,cursor:"pointer",fontSize:16,display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>
           <span style={{fontSize:32}}>📋</span>
           <span style={{color:"#c8a96e",fontWeight:600}}>Planungsbögen</span>
           <span style={{fontSize:12,color:"#8892a0"}}>Kundenbögen verwalten</span>
