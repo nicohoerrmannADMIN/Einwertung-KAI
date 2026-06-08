@@ -234,7 +234,7 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
       checkX(p1, 203.0, 519.5);
       if (v('probezeit_bis')) draw(p1, 253, 517.5, v('probezeit_bis'));
     } else if (probe === 'nein') {
-      checkX(p1, 232.1, 517.5);
+      checkX(p1, 229.1, 518.5); // 3pts left, 1pt down
     }
   }
 
@@ -281,7 +281,7 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
     const ky = kidYs[i-1];
     const kv = v(`kind${i}_vorname`);
     if (kv) {
-      draw(p2, 217, ky, kv, 7);        // Vorname 10pts more right
+      draw(p2, 227, ky, kv, 7);        // Vorname
       draw(p2, 348, ky, v(`kind${i}_name`), 7);  // Name 8pts more right
       draw(p2, 500, ky, v(`kind${i}_geb`), 7);   // Geburtsdatum unchanged
     }
@@ -318,19 +318,19 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
   // ── PAGE 3 ──────────────────────────────────────────────────────
   const p3 = pages[2];
   // Vermögen: value goes in 2nd column AFTER "davon einsetzen" text (after x=233)
-  draw(p3, 227, 120,   v('verm_immobilien'), 7);
-  draw(p3, 227, 140.2, v('verm_bank'), 7);
-  draw(p3, 227, 156.6, v('verm_wertpapiere'), 7);
-  draw(p3, 227, 174.2, v('verm_bausparer'), 7);
-  draw(p3, 227, 190.3, v('verm_versicherung'), 7);
-  draw(p3, 227, 214.3, v('verm_sonstiges'), 7);
-  draw(p3, 227, 231.3, fmt(vermSum), 7);
+  draw(p3, 217, 120,   v('verm_immobilien'), 7);
+  draw(p3, 217, 140.2, v('verm_bank'), 7);
+  draw(p3, 217, 156.6, v('verm_wertpapiere'), 7);
+  draw(p3, 217, 174.2, v('verm_bausparer'), 7);
+  draw(p3, 217, 190.3, v('verm_versicherung'), 7);
+  draw(p3, 217, 214.3, v('verm_sonstiges'), 7);
+  draw(p3, 217, 231.3, fmt(vermSum), 7);
 
   // Verbindlichkeiten: value in right entry column after labels (~x=432)
-  draw(p3, 452, 120,   v('verb_hypotheken'), 7);
-  draw(p3, 452, 140.2, v('verb_kredite'), 7);
-  draw(p3, 452, 174.2, v('verb_sonstige'), 7);
-  draw(p3, 452, 194.3, v('verb_buergschaften'), 7);
+  draw(p3, 460, 120,   v('verb_hypotheken'), 7);
+  draw(p3, 460, 140.2, v('verb_kredite'), 7);
+  draw(p3, 460, 174.2, v('verb_sonstige'), 7);
+  draw(p3, 460, 194.3, v('verb_buergschaften'), 7);
   draw(p3, 467, 222.8, fmt(verbSum), 7);         // Gesamt
 
   // Bank row: IBAN entry x=65 (label ends 61.8), BIC x=230 (label ends 227.6), seit x=450 (label ends 448.1)
@@ -411,7 +411,7 @@ body{background:var(--paper);color:var(--ink);font-family:'DM Mono',monospace;fo
 .m-row{display:flex;align-items:flex-start;justify-content:space-between;padding:14px;gap:10px;flex-wrap:wrap}
 .m-acts{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
 .m-detail{padding:16px;border-top:1px solid var(--line);background:var(--cream)}
-.fg{display:flex;flex-direction:column;gap:4px}
+.fg{display:flex;flex-direction:column;gap:3px;margin-bottom:12px}.fg .lbl{font-size:9px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase;margin-bottom:2px;padding-bottom:2px;border-bottom:1px solid var(--line)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .link-s{font-size:10px;color:var(--muted);word-break:break-all;margin-top:3px}
 .login-w{max-width:340px;margin:80px auto;padding:0 20px}
@@ -1291,7 +1291,7 @@ function AdminPage(){
                           {key:"wohnhaft_seit",label:"Wohnhaft seit",src:"admin"},
                           {key:"telefon",label:"Telefon",src:"crm"},
                           {key:"email",label:"E-Mail",src:"crm"},
-                          {key:"beruf",label:"Ausgeübte Tätigkeit",src:"crm"},
+
                         ].map(f=>(
                           <div key={f.key} className="fg">
                             <span className="lbl">{f.label}</span>
