@@ -226,13 +226,16 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
   if (az.includes('vollzeit')) checkX(p1, 203.0, 498.3);
   else if (az.includes('teilzeit')) checkX(p1, 242.5, 498.3);
 
-  // Probezeit: ja x0=203.0, nein x0=227.1 -> y=519.5
+  // Probezeit: only for employed (not selbstständig/Rentner/arbeitslos)
   const probe = v('probezeit').toLowerCase();
-  if (probe === 'ja') {
-    checkX(p1, 203.0, 519.5);
-    if (v('probezeit_bis')) draw(p1, 253, 517.5, v('probezeit_bis')); // 8pts right, 2pts up
-  } else {
-    checkX(p1, 232.1, 517.5); // nein (5pts right, 2pts up)
+  const bsForProbe = v('berufsstatus').toLowerCase();
+  if (!['selbstständig','rentner','arbeitslos'].some(x=>bsForProbe.includes(x))) {
+    if (probe === 'ja') {
+      checkX(p1, 203.0, 519.5);
+      if (v('probezeit_bis')) draw(p1, 253, 517.5, v('probezeit_bis'));
+    } else if (probe === 'nein') {
+      checkX(p1, 232.1, 517.5);
+    }
   }
 
   // Arbeitsverhältnis: unbefristet x0=202.9, befristet x0=251.1 -> y=540.8
