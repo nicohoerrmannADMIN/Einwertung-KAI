@@ -234,7 +234,7 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
       checkX(p1, 203.0, 519.5);
       if (v('probezeit_bis')) draw(p1, 253, 517.5, v('probezeit_bis'));
     } else if (probe === 'nein') {
-      checkX(p1, 229.1, 518.5); // 3pts left, 1pt down
+      checkX(p1, 227.1, 519.5); // 2pts left, 1pt down
     }
   }
 
@@ -281,7 +281,7 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
     const ky = kidYs[i-1];
     const kv = v(`kind${i}_vorname`);
     if (kv) {
-      draw(p2, 227, ky, kv, 7);        // Vorname
+      draw(p2, 233, ky, kv, 7);        // Vorname
       draw(p2, 348, ky, v(`kind${i}_name`), 7);  // Name 8pts more right
       draw(p2, 500, ky, v(`kind${i}_geb`), 7);   // Geburtsdatum unchanged
     }
@@ -1271,7 +1271,6 @@ function AdminPage(){
                           {key:"geburtsort",label:"Geburtsort",src:"admin"},
                           {key:"geburtsname",label:"Geburtsname",src:"admin"},
                           {key:"staatsangehoerigkeit",label:"Staatsangehörigkeit",src:"crm"},
-                          {key:"familienstand",label:"Familienstand",src:"crm"},
                         ].map(f=>(
                           <div key={f.key} className="fg">
                             <span className="lbl">{f.label}</span>
