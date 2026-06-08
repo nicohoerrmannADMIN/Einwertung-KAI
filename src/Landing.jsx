@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import App from "./App.jsx";
 import Planung from "./Planung.jsx";
@@ -12,13 +11,20 @@ export default function Landing() {
   const [view, setView] = useState(null);
 
   function check() {
-    if (pw === PASSWORD) { sessionStorage.setItem("landing_auth","1"); setAuth(true); }
-    else setError(true);
+    if (pw === PASSWORD) {
+      sessionStorage.setItem("landing_auth", "1");
+      setAuth(true);
+    } else {
+      setError(true);
+    }
   }
+
+  if (view === "einwertung") return <App />;
+  if (view === "planung") return <Planung />;
 
   if (!auth) return (
     <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"#0a0f1e",gap:20}}>
-      <div style={{color:"#c8a96e",fontSize:11,letterSpacing:"0.2em",textTransform:"uppercase"}}>Projekt 10/30 CRM</div>
+      <div style={{color:"#c8a96e",fontSize:11,letterSpacing:"0.2em",textTransform:"uppercase"}}>Projekt 1030</div>
       <div style={{color:"#f0ece4",fontFamily:"serif",fontSize:28}}>Startseite</div>
       <input
         type="password"
@@ -35,12 +41,9 @@ export default function Landing() {
     </div>
   );
 
-  if (view === "einwertung") return <App />;
-  if (view === "planung") return <Planung />;
-
   return (
     <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"#0a0f1e",gap:32}}>
-      <div style={{color:"#c8a96e",fontSize:11,letterSpacing:"0.2em",textTransform:"uppercase"}}>Projekt 10/30 CRM</div>
+      <div style={{color:"#c8a96e",fontSize:11,letterSpacing:"0.2em",textTransform:"uppercase"}}>Projekt 1030</div>
       <div style={{color:"#f0ece4",fontFamily:"serif",fontSize:32}}>Was möchtest du öffnen?</div>
       <div style={{display:"flex",gap:20}}>
         <button onClick={() => setView("einwertung")} style={{background:"#1a2236",border:"1px solid rgba(200,169,110,0.3)",color:"#f0ece4",padding:"24px 40px",borderRadius:6,cursor:"pointer",fontSize:16,display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>
