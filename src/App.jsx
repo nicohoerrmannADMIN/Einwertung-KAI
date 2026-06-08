@@ -318,13 +318,13 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
   // ── PAGE 3 ──────────────────────────────────────────────────────
   const p3 = pages[2];
   // Vermögen: value goes in 2nd column AFTER "davon einsetzen" text (after x=233)
-  draw(p3, 217, 120,   v('verm_immobilien'), 7);
+  draw(p3, 205, 130,   v('verm_immobilien'), 7);  // aligned with other verm rows
   draw(p3, 205, 140.2, v('verm_bank'), 7);
   draw(p3, 205, 156.6, v('verm_wertpapiere'), 7);
   draw(p3, 205, 174.2, v('verm_bausparer'), 7);
   draw(p3, 205, 190.3, v('verm_versicherung'), 7);
   draw(p3, 205, 214.3, v('verm_sonstiges'), 7);
-  draw(p3, 205, 231.3, fmt(vermSum), 7);
+  draw(p3, 200, 231.3, fmt(vermSum), 7);
 
   // Verbindlichkeiten: value in right entry column after labels (~x=432)
   draw(p3, 460, 120,   v('verb_hypotheken'), 7);
@@ -678,7 +678,7 @@ function SAWizard({crmData, adminData, existing, onSave, onClose}) {
         <div className="sa-nav">
           <button className="btn btn-o btn-sm" onClick={back} disabled={step===0}>← Zurück</button>
           {isLast
-            ?<button className="btn btn-ok btn-sm" onClick={()=>{if(canNext())onSave({...vals});}}>Selbstauskunft speichern ✓</button>
+            ?<button className="btn btn-ok btn-sm" onClick={()=>onSave({...vals})}>Selbstauskunft speichern ✓</button>
             :<button className="btn btn-sm" disabled={!canNext()} onClick={next}>Weiter →</button>
           }
         </div>
@@ -794,8 +794,10 @@ function MandantPage({mandantId}) {
 
   async function handleSaveSA(vals){
     const nd={...data,selbstauskunft:vals};
-    setData(nd);await saveMandantData(mandantId,nd);
-    setShowSA(false);setToast("Selbstauskunft gespeichert ✓");
+    setData(nd);
+    await saveMandantData(mandantId,nd);
+    setShowSA(false);
+    setToast("Selbstauskunft gespeichert ✓");
   }
 
   function handleDownloadAll(){
