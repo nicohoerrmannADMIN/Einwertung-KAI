@@ -868,12 +868,16 @@ function MandantPage({mandantId}) {
       }
 
       await window.emailjs.send(EMAILJS_SERVICE,EMAILJS_TEMPLATE,{
-        title:`Einwertung – ${fullName}`,
+        title:`Neue Einreichung: ${fullName}`,
         name:fullName,
         email:"einwertung@ks2.de",
-        message:`Neue Unterlagen eingereicht von: ${fullName}\n\n=== DOKUMENTE ===\n${uploadList}\n\nBitte Mandanten-Link öffnen um Dateien herunterzuladen:\n${genLink(mandantId)}`,
+        message:`${fullName} hat alle Unterlagen eingereicht und ist bereit zur Bearbeitung.`,
       });
 
+      // Mark as eingereicht in storage so admin sees it
+      const nd2={...data,eingereicht:true,eingereichAt:new Date().toISOString()};
+      setData(nd2);
+      await saveMandantData(mandantId,nd2);
       setDone(true);
     }catch(e){
       console.error(e);setToast("Fehler beim Einreichen – bitte erneut versuchen");
@@ -1016,7 +1020,7 @@ function MandantPage({mandantId}) {
       <span className="lbl">Dokumente herunterladen</span>
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
         {/* Download ALL button */}
-        <button className="btn btn-ok" style={{width:"100%"}} onClick={async()=>{
+        <button className="btn btn-o" style={{width:"100%",borderColor:"var(--line)",color:"var(--muted)"}} onClick={async()=>{
           let count=0;
           if(selbstauskunft){
             try{
@@ -1246,7 +1250,10 @@ function AdminPage(){
             {Object.entries(mandanten).sort((a,b)=>new Date(b[1].createdAt)-new Date(a[1].createdAt)).map(([id,m])=>{
               const d=details[id];const exp=expandedId===id;
               return(
-                <div key={id} className="m-item">
+                <div key={id} className="m-item" style={{
+                  borderColor: d?.eingereicht ? "var(--ok)" : "var(--line)",
+                  background: d?.eingereicht ? "var(--ok-bg)" : "var(--paper)"
+                }}>
                   <div className="m-row">
                     <div style={{flex:1}}>
                       <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
@@ -1254,6 +1261,7 @@ function AdminPage(){
                         {d?.crmData&&<span className="badge badge-ok">CRM</span>}
                         {d?.adminData?.iban&&<span className="badge badge-ok">IBAN</span>}
                         {d?.selbstauskunft&&<span className="badge badge-ok">SA ✓</span>}
+                        {d?.eingereicht&&<span className="badge badge-ok" style={{background:"var(--ok)",color:"white"}}>✓ Eingereicht</span>}
                       </div>
                       <div style={{fontSize:11,color:"var(--muted)",marginTop:2}}>{getProgress(id)} Schritte</div>
                       <div className="link-s">{genLink(id)}</div>
