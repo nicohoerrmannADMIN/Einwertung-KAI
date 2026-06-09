@@ -315,8 +315,8 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
   // Lebenshaltungskosten: label links der Trennlinie, Wert rechts in Wert-Spalte
   const nettoForLH = parseFloat(String(v('eink_lohn')||v('eink_selbst')||'0').replace(/[^0-9.,]/g,'').replace(',','.')) || 0;
   const lhKosten = nettoForLH > 0 ? Math.round(nettoForLH * 0.35) : 0;
-  draw(p2, 356, 465.1, 'Lebenshaltungskosten (35% Netto)', 6);
-  if(lhKosten > 0) draw(p2, 500, 465.1, lhKosten.toLocaleString('de-DE') + ' €', 7);
+  draw(p2, 356, 482, 'Lebenshaltungskosten (35% Netto)', 6);
+  if(lhKosten > 0) draw(p2, 500, 482, lhKosten.toLocaleString('de-DE') + ' €', 7);
   draw(p2, 503, 516.2, fmt(ausgSum));
 
   // Rentenansprüche
