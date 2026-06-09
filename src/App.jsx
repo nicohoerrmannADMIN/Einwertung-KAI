@@ -5,19 +5,50 @@ const EMAILJS_SERVICE = "service_0jj5ihm";
 const EMAILJS_TEMPLATE = "template_mamsnhk";
 const EMAILJS_PUBLIC = "KenDwBUdjTdLSbgM-";
 
-// ── Storage ──────────────────────────────────────────────────────
-async function loadMandanten() {
-  try { const r = localStorage.getItem("mandanten"); return r ? JSON.parse(r) : {}; } catch { return {}; }
+// ── Supabase Storage ───────────────────────────────────────────
+const SB_URL = "https://jtlblbgxzbxjplamdpiu.supabase.co";
+const SB_KEY = "sb_publishable_XZaNy8RC0iATbuq2IVJ0Qg_9qNDsMBd";
+
+async function sbFetch(path, method="GET", body=null, prefer="return=representation") {
+  const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
+    method,
+    headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Content-Type": "application/json", "Prefer": prefer },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  if (!res.ok) { console.error("SB:", res.status, await res.text()); return null; }
+  const t = await res.text(); return t ? JSON.parse(t) : null;
 }
-async function saveMandanten(d) { localStorage.setItem("mandanten", JSON.stringify(d)); }
+async function loadMandanten() {
+  try {
+    const rows = await sbFetch("mandanten?select=*&order=created_at.desc");
+    if (!rows) return {};
+    const obj = {};
+    rows.forEach(r => { obj[r.id] = { vorname: r.vorname, nachname: r.nachname, pin: r.pin, createdAt: r.created_at }; });
+    return obj;
+  } catch(e) { return {}; }
+}
+async function saveMandanten(d) { /* handled via createMandant */ }
 async function loadMandantData(id) {
-  try { const r = localStorage.getItem(`mandant_${id}`); return r ? JSON.parse(r) : null; } catch { return null; }
+  try {
+    const rows = await sbFetch(`mandant_data?mandant_id=eq.${id}&select=data`);
+    return (rows && rows.length > 0) ? rows[0].data : null;
+  } catch(e) { return null; }
 }
 async function saveMandantData(id, d) {
-  // Remove _file objects before saving (can't serialize File objects)
-  const clean = JSON.parse(JSON.stringify(d, (k,v) => k === "_file" ? undefined : v));
-  localStorage.setItem(`mandant_${id}`, JSON.stringify(clean));
+  try {
+    const clean = JSON.parse(JSON.stringify(d, (k,v) => k === "_file" ? undefined : v));
+    await sbFetch("mandant_data", "POST", { mandant_id: id, data: clean }, "resolution=merge-duplicates,return=minimal");
+  } catch(e) { console.error(e); }
 }
+async function createMandant(id, vorname, nachname, pin) {
+  await sbFetch("mandanten", "POST", { id, vorname, nachname, pin }, "return=minimal");
+  await sbFetch("mandant_data", "POST", { mandant_id: id, data: { vorname, nachname, pin, uploads: {}, selbstauskunft: null, crmData: null, adminData: {} } }, "return=minimal");
+}
+async function deleteMandant(id) {
+  await sbFetch(`mandant_data?mandant_id=eq.${id}`, "DELETE", null, "return=minimal");
+  await sbFetch(`mandanten?id=eq.${id}`, "DELETE", null, "return=minimal");
+}
+
 
 // ── Utils ────────────────────────────────────────────────────────
 function genId() { return Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
@@ -1151,16 +1182,16 @@ function AdminPage(){
     const t=name.trim();if(!t)return;
     const p=t.split(" ");const id=genId();
     const pin = String(Math.floor(10000 + Math.random() * 90000));
+    await createMandant(id, p[0], p.slice(1).join(" "), pin);
     const nm={...mandanten,[id]:{vorname:p[0],nachname:p.slice(1).join(" "),createdAt:new Date().toISOString(),pin}};
-    await saveMandanten(nm);
-    await saveMandantData(id,{vorname:p[0],nachname:p.slice(1).join(" "),uploads:{},selbstauskunft:null,crmData:null,adminData:{},pin});
     setMandanten(nm);setName("");setToast(`${t} angelegt ✓`);
   }
 
   async function handleDelete(id){
     const m=mandanten[id];
     if(!window.confirm(`Mandant "${m.vorname} ${m.nachname}" wirklich löschen? Alle Daten gehen verloren.`)) return;
-    const nm={...mandanten};delete nm[id];await saveMandanten(nm);setMandanten(nm);
+    await deleteMandant(id);
+    const nm={...mandanten};delete nm[id];setMandanten(nm);
     setToast("Mandant gelöscht");
   }
   function handleCopy(id){navigator.clipboard.writeText(genLink(id));setCopiedId(id);setTimeout(()=>setCopiedId(null),2000);}
