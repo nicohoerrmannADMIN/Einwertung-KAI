@@ -166,7 +166,9 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
   }
 
   const einkSum = ['eink_lohn','eink_kindergeld','eink_unterhalt_k','eink_kapital','eink_selbst','eink_miete','eink_rente','eink_sonstige'].reduce((a,k)=>a+euros(v(k)),0);
-  const ausgSum = ['ausg_miete','ausg_nk','ausg_vers','ausg_pkv','ausg_darlehen','ausg_raten','ausg_unterhalt','ausg_altersvorsorge','ausg_sonstige'].reduce((a,k)=>a+euros(v(k)),0);
+  const nettoForSum = parseFloat(String(sa['eink_lohn']||sa['eink_selbst']||'0').replace(/[^0-9.,]/g,'').replace(',','.')) || 0;
+  const lhKostenSum = nettoForSum > 0 ? Math.round(nettoForSum * 0.35) : 0;
+  const ausgSum = ['ausg_miete','ausg_nk','ausg_pkv','ausg_darlehen','ausg_raten','ausg_unterhalt','ausg_altersvorsorge'].reduce((a,k)=>a+euros(v(k)),0) + lhKostenSum;
   const vermSum = ['verm_immobilien','verm_bank','verm_wertpapiere','verm_bausparer','verm_versicherung','verm_sonstiges'].reduce((a,k)=>a+euros(v(k)),0);
   const verbSum = ['verb_hypotheken','verb_kredite','verb_sonstige','verb_buergschaften'].reduce((a,k)=>a+euros(v(k)),0);
 
@@ -202,8 +204,8 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
   draw(p1, EX, 362.2, v('email'));
   draw(p1, EX, 383.5, v('staatsangehoerigkeit'));
 
-  // Aufenthaltsgenehmigung: unbefristet checkbox at x0=202.9, y=404.7
-  checkX(p1, 202.9, 404.7); // always unbefristet
+  // Aufenthaltsgenehmigung: unbefristet wenn deutsch, sonst leer lassen
+  if(v('staatsangehoerigkeit').toLowerCase().includes('deutsch')) checkX(p1, 202.9, 404.7);
 
   // Arbeitserlaubnis: unbefristet checkbox at x0=202.9, y=426.0
   checkX(p1, 202.9, 426.0); // always unbefristet
@@ -308,12 +310,15 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
   draw(p2, 530, 414.1, v('ausg_altersvorsorge'));
   draw(p2, 530, 431.1, v('ausg_pkv'));
   draw(p2, 530, 448.1, v('ausg_unterhalt'));
-  draw(p2, 530, 465.1, v('ausg_sonstige'));
+  // Sonstige Ausgaben = Lebenshaltungskosten 35% vom Netto (Bank rechnet so)
+  const nettoForLH = parseFloat(String(v('eink_lohn')||v('eink_selbst')||'0').replace(/[^0-9.,]/g,'').replace(',','.')) || 0;
+  const lhKosten = nettoForLH > 0 ? Math.round(nettoForLH * 0.35) : 0;
+  const lhText = lhKosten > 0 ? `Lebenshaltungskosten ${lhKosten.toLocaleString('de-DE')} €` : v('ausg_sonstige');
+  draw(p2, 530, 465.1, lhText, 7);
   draw(p2, 503, 516.2, fmt(ausgSum));
 
   // Rentenansprüche
-  draw(p2, 530, 562, v('rente_gesetzlich'));
-  draw(p2, 530, 585, v('rente_privat'));
+  // Rentenansprüche: nicht mehr abgefragt
 
   // ── PAGE 3 ──────────────────────────────────────────────────────
   const p3 = pages[2];
@@ -525,83 +530,95 @@ function SAWizard({crmData, adminData, existing, onSave, onClose}) {
   const set = (k,v) => setVals(p=>({...p,[k]:v}));
 
   const steps = [];
-  steps.push({id:"berufsstatus",type:"choice",q:"Wie bist du aktuell beschäftigt?",opts:["Angestellter","Arbeiter","Beamter","öffentlicher Dienst","selbstständig","Rentner","arbeitslos"],key:"berufsstatus",
+
+  // Berufsstatus
+  steps.push({id:"berufsstatus",type:"choice",q:"Wie bist du aktuell beschäftigt?",
+    opts:["Angestellter","Arbeiter","Beamter","öffentlicher Dienst","selbstständig","Rentner","arbeitslos"],key:"berufsstatus",
     onSelect:(v,setVals)=>{
-      // Clear fields irrelevant for self-employed/retired/unemployed
       if(["selbstständig","Rentner","arbeitslos"].includes(v)){
-        setVals(p=>({...p,berufsstatus:v,arbeitszeit:"",arbeitsverhaeltnis:"",befristet_bis:"",probezeit:"",probezeit_bis:"",arbeitgeber:"",beschaeftigt_seit:""}));
+        setVals(p=>({...p,berufsstatus:v,arbeitszeit:"",arbeitsverhaeltnis:"",befristet_bis:"",probezeit:"",probezeit_bis:""}));
       }
     }
   });
+
+  // Berufsbezeichnung always
+  steps.push({id:"berufsbezeichnung",type:"text",q:"Deine Berufsbezeichnung:",key:"berufsbezeichnung",placeholder:"z.B. Kaufmann/frau, Ingenieur"});
+
+  // Employed-only fields
   if(!["selbstständig","Rentner","arbeitslos"].includes(vals.berufsstatus)){
-    steps.push({id:"beruf_detail",type:"multi",q:"Dein Beruf & Arbeitgeber",fields:[
-      {key:"berufsbezeichnung",label:"Berufsbezeichnung",placeholder:"z.B. Kaufmann/frau"},
-      {key:"arbeitgeber",label:"Arbeitgeber",placeholder:"Firmenname"},
-      {key:"beschaeftigt_seit",label:"Beschäftigt seit (MM/JJJJ)",placeholder:"01/2020"},
-    ]});
     steps.push({id:"arbeitszeit",type:"choice",q:"Wie arbeitest du?",opts:["Vollzeit","Teilzeit"],key:"arbeitszeit"});
     steps.push({id:"arbeitsverhaeltnis",type:"choice",q:"Art des Arbeitsverhältnisses?",opts:["unbefristet","befristet"],key:"arbeitsverhaeltnis"});
     if(vals.arbeitsverhaeltnis==="befristet") steps.push({id:"befristet_bis",type:"text",q:"Befristung läuft aus am:",key:"befristet_bis",placeholder:"MM/JJJJ"});
     steps.push({id:"probezeit",type:"choice",q:"Bist du aktuell in der Probezeit?",opts:["Nein","Ja"],key:"probezeit"});
     if(vals.probezeit==="Ja") steps.push({id:"probezeit_bis",type:"text",q:"Probezeit endet am:",key:"probezeit_bis",placeholder:"MM/JJJJ"});
   }
+
+  // Selbstständig seit
   if(vals.berufsstatus==="selbstständig") steps.push({id:"selbst_seit",type:"text",q:"Selbstständig tätig seit:",key:"selbststaendig_seit",placeholder:"MM/JJJJ"});
+
+  // Familie
   steps.push({id:"familienstand",type:"choice",q:"Familienstand?",opts:["ledig","verheiratet","Lebensgemeinschaft","geschieden","verwitwet","getrennt lebend"],key:"familienstand"});
   if(["verheiratet","Lebensgemeinschaft"].includes(vals.familienstand)) steps.push({id:"gueterstand",type:"choice",q:"Güterstand?",opts:["gesetzlicher Güterstand","Gütertrennung","Gütergemeinschaft"],key:"gueterstand"});
-  steps.push({id:"kinder_anzahl",type:"choice",q:"Anzahl unterhaltsberechtigte Kinder?",opts:["0","1","2","3","4","5+"],key:"kinder_anzahl"});
+  steps.push({id:"kinder_anzahl",type:"choice",q:"Anzahl unterhaltsberechtigte Kinder (unter 25 Jahre)?",opts:["0","1","2","3","4","5+"],key:"kinder_anzahl"});
   for(let i=1;i<=Math.min(parseInt(vals.kinder_anzahl||"0"),5);i++){
-    steps.push({id:`kind_${i}`,type:"multi",q:`Kind ${i} – Angaben`,fields:[
+    steps.push({id:`kind_${i}`,type:"multi",q:`Kind ${i}`,fields:[
       {key:`kind${i}_vorname`,label:"Vorname",placeholder:"Vorname"},
       {key:`kind${i}_name`,label:"Nachname",placeholder:"Nachname"},
       {key:`kind${i}_geb`,label:"Geburtsdatum",placeholder:"TT.MM.JJJJ"},
     ]});
   }
-  const einkFields = [
+
+  // Einkommen - compute Lebenshaltungskosten = 35% of netto
+  const nettoVal = parseFloat(String(vals.eink_lohn||vals.eink_selbst||"0").replace(/[^0-9.,]/g,"").replace(",",".")) || 0;
+  const lebenshaltung = nettoVal > 0 ? Math.round(nettoVal * 0.35) : 0;
+
+  steps.push({id:"einkommen",type:"sumFields",q:"Monatliches Nettoeinkommen",hint:"Alle Angaben in € pro Monat",fields:[
     {key:"eink_lohn",label:"Lohn/Gehalt netto (monatlich)",placeholder:"3.500"},
     {key:"eink_anzahl_mg",label:"Anzahl Monatsgehälter/Jahr",placeholder:"12"},
-  ];
-  if(parseInt(vals.kinder_anzahl||"0")>0) einkFields.push({key:"eink_kindergeld",label:"Kindergeld gesamt (alle Kinder/Monat)",placeholder:"250"});
-  einkFields.push(
-    {key:"eink_unterhalt_k",label:"Unterhalt Kinder eingehend (gesamt)",placeholder:"0"},
-    {key:"eink_kapital",label:"Kapitaleinkünfte (Depot, Zinsen etc.)",placeholder:"0"},
-    {key:"eink_selbst",label:"Einkünfte selbstständige Tätigkeit",placeholder:"0"},
+    {key:"eink_kindergeld",label:"Kindergeld gesamt",placeholder:"0"},
+    {key:"eink_unterhalt_ehegatte",label:"Unterhalt von Ehegatten",placeholder:"0"},
+    {key:"eink_unterhalt_k",label:"Unterhalt von Kindern",placeholder:"0"},
+    {key:"eink_selbst",label:"Aus selbstständiger Tätigkeit",placeholder:"0"},
     {key:"eink_miete",label:"Mieteinnahmen (kalt)",placeholder:"0"},
-    {key:"eink_rente",label:"Renten (BU, gesetzl., Pension etc.)",placeholder:"0"},
+    {key:"eink_kapital",label:"Kapitaleinkünfte",placeholder:"0"},
+    {key:"eink_rente",label:"Renten/Pensionen",placeholder:"0"},
     {key:"eink_sonstige",label:"Sonstige Einnahmen",placeholder:"0"},
-  );
-  steps.push({id:"einkommen",type:"sumFields",q:"Monatliches Nettoeinkommen",hint:"Alle Angaben in € pro Monat",fields:einkFields,sumKeys:["eink_lohn","eink_kindergeld","eink_unterhalt_k","eink_kapital","eink_selbst","eink_miete","eink_rente","eink_sonstige"]});
+  ],sumKeys:["eink_lohn","eink_kindergeld","eink_unterhalt_ehegatte","eink_unterhalt_k","eink_selbst","eink_miete","eink_kapital","eink_rente","eink_sonstige"]});
+
+  // Ausgaben - NO LV/Bauspar, auto Lebenshaltungskosten
   steps.push({id:"ausgaben",type:"sumFields",q:"Monatliche Ausgaben",hint:"Alle Angaben in € pro Monat",fields:[
     {key:"ausg_miete",label:"Miete (entfällt bei Kauf)",placeholder:"850"},
     {key:"ausg_nk",label:"Nebenkosten",placeholder:"200"},
-    {key:"ausg_vers",label:"Versicherungen / Bauspar / Riester",placeholder:"350"},
     {key:"ausg_pkv",label:"Private Krankenversicherung",placeholder:"0"},
     {key:"ausg_darlehen",label:"Bestehende Darlehen (monatl. Rate)",placeholder:"0"},
     {key:"ausg_raten",label:"Sonstige Ratenverpflichtungen",placeholder:"0"},
     {key:"ausg_unterhalt",label:"Unterhaltszahlungen (ausgehend)",placeholder:"0"},
     {key:"ausg_altersvorsorge",label:"Altersvorsorge (Selbstständige)",placeholder:"0"},
-    {key:"ausg_sonstige",label:"Sonstige Ausgaben",placeholder:"0"},
-  ],sumKeys:["ausg_miete","ausg_nk","ausg_vers","ausg_pkv","ausg_darlehen","ausg_raten","ausg_unterhalt","ausg_altersvorsorge","ausg_sonstige"]});
-  steps.push({id:"rente",type:"sumFields",q:"Rentenansprüche (Schätzung)",hint:"Ungefähre monatliche Beträge – grobe Schätzung reicht",fields:[
-    {key:"rente_gesetzlich",label:"Gesetzliche Rente (ca.)",placeholder:"800"},
-    {key:"rente_privat",label:"Private Renten / LV-Auszahlung (ca.)",placeholder:"0"},
-  ],sumKeys:["rente_gesetzlich","rente_privat"]});
+  ],sumKeys:["ausg_miete","ausg_nk","ausg_pkv","ausg_darlehen","ausg_raten","ausg_unterhalt","ausg_altersvorsorge"],
+  extraLabel:`Lebenshaltungskosten (pauschal 35% vom Netto): ${lebenshaltung > 0 ? lebenshaltung.toLocaleString("de-DE")+" €" : "–"}`,
+  extraVal:lebenshaltung});
+
+  // Vermögen
   steps.push({id:"vermoegen",type:"sumFields",q:"Vorhandenes Vermögen",hint:"Aktuelle Werte in €",fields:[
     {key:"verm_immobilien",label:"Immobilien (Verkehrswert)",placeholder:"0"},
     {key:"verm_bank",label:"Bank- & Sparguthaben",placeholder:"0"},
-    {key:"verm_wertpapiere",label:"Wertpapiere / Depot (Kurswert)",placeholder:"0"},
+    {key:"verm_wertpapiere",label:"Wertpapiere / Depot",placeholder:"0"},
     {key:"verm_bausparer",label:"Bausparvertrag",placeholder:"0"},
     {key:"verm_versicherung",label:"Lebensversicherung (Rückkaufswert)",placeholder:"0"},
     {key:"verm_sonstiges",label:"Sonstiges Vermögen",placeholder:"0"},
   ],sumKeys:["verm_immobilien","verm_bank","verm_wertpapiere","verm_bausparer","verm_versicherung","verm_sonstiges"]});
-  steps.push({id:"einsetzbar",type:"text",q:"Einsetzbares Kapital",hint:"Wie viel Kapital könntest du tatsächlich für den Immobilienkauf einsetzen? (der Betrag, den du bereit bist zu verwenden)",key:"einsetzbar",placeholder:"30.000"});
+
+  steps.push({id:"einsetzbar",type:"text",q:"Wie viel Kapital könntest du einsetzen?",hint:"Einsetzbares Kapital = der Betrag den du bereit bist für den Immobilienkauf zu verwenden.",key:"einsetzbar",placeholder:"30.000"});
+
+  // Verbindlichkeiten
   steps.push({id:"verbindlichkeiten",type:"sumFields",q:"Bestehende Verbindlichkeiten",hint:"Aktuelle Restschulden in €",fields:[
     {key:"verb_hypotheken",label:"Hypotheken / Grundschulden",placeholder:"0"},
     {key:"verb_kredite",label:"Bank- / Privatkredite",placeholder:"0"},
     {key:"verb_sonstige",label:"Sonstige Verbindlichkeiten",placeholder:"0"},
     {key:"verb_buergschaften",label:"Übernommene Bürgschaften",placeholder:"0"},
   ],sumKeys:["verb_hypotheken","verb_kredite","verb_sonstige","verb_buergschaften"]});
-  steps.push({id:"fertig",type:"done",q:"Alles ausgefüllt!",hint:"Deine Angaben sind vollständig. Klicke auf Speichern um die Selbstauskunft abzuschließen."});
 
+  steps.push({id:"fertig",type:"done",q:"Alles ausgefüllt!",hint:"Deine Angaben sind vollständig. Klicke auf Speichern um die Selbstauskunft abzuschließen."});
 
   const cur = steps[step]||steps[steps.length-1];
   const total = steps.length;
@@ -1091,7 +1108,7 @@ function MandantPage({mandantId}) {
 // ── Admin Login ──────────────────────────────────────────────────
 function AdminLogin({onLogin}){
   const [pw,setPw]=useState("");const [err,setErr]=useState(false);
-  function check(){sessionStorage.setItem("ks2admin","1");onLogin();}
+  function check(){if(pw===ADMIN_PASSWORD){sessionStorage.setItem("ks2admin","1");onLogin();}else{setErr(true);setTimeout(()=>setErr(false),2000);}}
   return(
     <div className="app"><style>{CSS}</style>
       <div className="login-w">
@@ -1323,22 +1340,7 @@ function AdminPage(){
                         ))}
                       </div>
 
-                      <span className="lbl" style={{marginTop:14}}>Ausweis & Bankverbindung</span>
-                      <div className="grid2">
-                        {[
-                          {key:"ausweis_nr",label:"Ausweis-Nr."},
-                          {key:"ausstellungsbehoerde",label:"Ausstellungsbehörde"},
-                          {key:"gueltig_bis",label:"Gültig bis"},
-                          {key:"iban",label:"IBAN"},
-                          {key:"bic",label:"BIC"},
-                          {key:"bank_seit",label:"Bankverbindung seit"},
-                        ].map(f=>(
-                          <div key={f.key} className="fg">
-                            <span className="lbl">{f.label}</span>
-                            <input className="ifield" value={d?.adminData?.[f.key]||""} onChange={e=>handleAdminField(id,f.key,e.target.value)} placeholder={f.label}/>
-                          </div>
-                        ))}
-                      </div>
+
                     </div>
                   )}
                 </div>
