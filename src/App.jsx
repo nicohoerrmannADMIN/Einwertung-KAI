@@ -312,11 +312,11 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
   draw(p2, 530, 414.1, v('ausg_altersvorsorge'));
   draw(p2, 530, 431.1, v('ausg_pkv'));
   draw(p2, 530, 448.1, v('ausg_unterhalt'));
-  // Sonstige Ausgaben = Lebenshaltungskosten 35% vom Netto (Bank rechnet so)
+  // Lebenshaltungskosten: label links der Trennlinie, Wert rechts in Wert-Spalte
   const nettoForLH = parseFloat(String(v('eink_lohn')||v('eink_selbst')||'0').replace(/[^0-9.,]/g,'').replace(',','.')) || 0;
   const lhKosten = nettoForLH > 0 ? Math.round(nettoForLH * 0.35) : 0;
-  const lhText = lhKosten > 0 ? `Lebenshaltungskosten ${lhKosten.toLocaleString('de-DE')} €` : v('ausg_sonstige');
-  draw(p2, 323, 465.1, lhText, 7);
+  draw(p2, 299, 465.1, 'Lebenshaltungskosten (35% Netto)', 6);
+  if(lhKosten > 0) draw(p2, 500, 465.1, lhKosten.toLocaleString('de-DE') + ' €', 7);
   draw(p2, 503, 516.2, fmt(ausgSum));
 
   // Rentenansprüche
