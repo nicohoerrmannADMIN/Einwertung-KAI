@@ -314,7 +314,7 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
   const nettoForLH = parseFloat(String(v('eink_lohn')||v('eink_selbst')||'0').replace(/[^0-9.,]/g,'').replace(',','.')) || 0;
   const lhKosten = nettoForLH > 0 ? Math.round(nettoForLH * 0.35) : 0;
   const lhText = lhKosten > 0 ? `Lebenshaltungskosten ${lhKosten.toLocaleString('de-DE')} €` : v('ausg_sonstige');
-  draw(p2, 510, 465.1, lhText, 7);
+  draw(p2, 495, 465.1, lhText, 7);
   draw(p2, 503, 516.2, fmt(ausgSum));
 
   // Rentenansprüche
@@ -594,8 +594,9 @@ function SAWizard({crmData, adminData, existing, onSave, onClose}) {
     {key:"ausg_raten",label:"Sonstige Ratenverpflichtungen",placeholder:"0"},
     {key:"ausg_unterhalt",label:"Unterhaltszahlungen (ausgehend)",placeholder:"0"},
   ],sumKeys:["ausg_miete","ausg_nk","ausg_pkv","ausg_darlehen","ausg_raten","ausg_unterhalt"],
-  extraLabel:`Lebenshaltungskosten (pauschal 35% vom Netto): ${lebenshaltung > 0 ? lebenshaltung.toLocaleString("de-DE")+" €" : "–"}`,
-  extraVal:lebenshaltung});
+  extraLabel:`Lebenshaltungskosten: ${lebenshaltung > 0 ? lebenshaltung.toLocaleString("de-DE")+" € (35% vom Netto – Bank rechnet immer 35%)" : "– (wird nach Nettoeingabe berechnet)"}`,
+  extraVal:lebenshaltung,
+  extraHint:"Die Bank setzt pauschal 35% des Nettoeinkommens als Lebenshaltungskosten an – unabhängig von den tatsächlichen Ausgaben."});
 
   // Vermögen
   steps.push({id:"vermoegen",type:"sumFields",q:"Vorhandenes Vermögen",hint:"Aktuelle Werte in €",fields:[
@@ -690,9 +691,18 @@ function SAWizard({crmData, adminData, existing, onSave, onClose}) {
                 <input className="ifield" style={{width:"100%"}} value={vals[f.key]||""} onChange={e=>set(f.key,e.target.value)} placeholder={f.placeholder||"0"} inputMode="decimal"/>
               </div>
             ))}
-            <div className="sum-box">
+            {cur.extraLabel&&(
+              <div className="sum-box" style={{marginTop:8,background:"var(--ok-bg)",borderColor:"var(--ok)",flexDirection:"column",alignItems:"flex-start",gap:4}}>
+                <div style={{display:"flex",justifyContent:"space-between",width:"100%"}}>
+                  <span style={{fontSize:12}}>+ Lebenshaltungskosten</span>
+                  <span className="sum-val">{cur.extraVal>0?fmtEuros(cur.extraVal):"–"}</span>
+                </div>
+                <div style={{fontSize:11,color:"var(--muted)"}}>Bank rechnet pauschal 35% vom Netto – unabhängig von tatsächlichen Ausgaben</div>
+              </div>
+            )}
+            <div className="sum-box" style={{marginTop:4}}>
               <span>Gesamt</span>
-              <span className="sum-val">{fmtEuros(computeSum(cur.sumKeys))}</span>
+              <span className="sum-val">{fmtEuros(computeSum(cur.sumKeys)+(cur.extraVal||0))}</span>
             </div>
           </div>
         )}
