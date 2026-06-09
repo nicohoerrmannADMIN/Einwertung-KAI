@@ -256,6 +256,8 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
 
   // ── PAGE 2 ──────────────────────────────────────────────────────
   const p2 = pages[1];
+  // Miete entfällt künftig: immer 'nein' (Immobilie ist Anlage)
+  checkX(p2, 406.1, 300.7);
 
   // Familienstand checkboxes
   // ledig x0=203.0, verheiratet x0=235.7 -> y=108.0
@@ -314,7 +316,7 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
   const nettoForLH = parseFloat(String(v('eink_lohn')||v('eink_selbst')||'0').replace(/[^0-9.,]/g,'').replace(',','.')) || 0;
   const lhKosten = nettoForLH > 0 ? Math.round(nettoForLH * 0.35) : 0;
   const lhText = lhKosten > 0 ? `Lebenshaltungskosten ${lhKosten.toLocaleString('de-DE')} €` : v('ausg_sonstige');
-  draw(p2, 495, 465.1, lhText, 7);
+  draw(p2, 465, 465.1, lhText, 7);
   draw(p2, 503, 516.2, fmt(ausgSum));
 
   // Rentenansprüche
