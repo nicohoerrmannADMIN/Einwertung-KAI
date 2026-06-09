@@ -314,7 +314,7 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
   const nettoForLH = parseFloat(String(v('eink_lohn')||v('eink_selbst')||'0').replace(/[^0-9.,]/g,'').replace(',','.')) || 0;
   const lhKosten = nettoForLH > 0 ? Math.round(nettoForLH * 0.35) : 0;
   const lhText = lhKosten > 0 ? `Lebenshaltungskosten ${lhKosten.toLocaleString('de-DE')} €` : v('ausg_sonstige');
-  draw(p2, 530, 465.1, lhText, 7);
+  draw(p2, 510, 465.1, lhText, 7);
   draw(p2, 503, 516.2, fmt(ausgSum));
 
   // Rentenansprüche
@@ -587,14 +587,13 @@ function SAWizard({crmData, adminData, existing, onSave, onClose}) {
 
   // Ausgaben - NO LV/Bauspar, auto Lebenshaltungskosten
   steps.push({id:"ausgaben",type:"sumFields",q:"Monatliche Ausgaben",hint:"Alle Angaben in € pro Monat",fields:[
-    {key:"ausg_miete",label:"Miete (entfällt bei Kauf)",placeholder:"850"},
+    {key:"ausg_miete",label:"Monatliche Miete",placeholder:"850"},
     {key:"ausg_nk",label:"Nebenkosten",placeholder:"200"},
     {key:"ausg_pkv",label:"Private Krankenversicherung",placeholder:"0"},
     {key:"ausg_darlehen",label:"Bestehende Darlehen (monatl. Rate)",placeholder:"0"},
     {key:"ausg_raten",label:"Sonstige Ratenverpflichtungen",placeholder:"0"},
     {key:"ausg_unterhalt",label:"Unterhaltszahlungen (ausgehend)",placeholder:"0"},
-    {key:"ausg_altersvorsorge",label:"Altersvorsorge (Selbstständige)",placeholder:"0"},
-  ],sumKeys:["ausg_miete","ausg_nk","ausg_pkv","ausg_darlehen","ausg_raten","ausg_unterhalt","ausg_altersvorsorge"],
+  ],sumKeys:["ausg_miete","ausg_nk","ausg_pkv","ausg_darlehen","ausg_raten","ausg_unterhalt"],
   extraLabel:`Lebenshaltungskosten (pauschal 35% vom Netto): ${lebenshaltung > 0 ? lebenshaltung.toLocaleString("de-DE")+" €" : "–"}`,
   extraVal:lebenshaltung});
 
@@ -603,10 +602,8 @@ function SAWizard({crmData, adminData, existing, onSave, onClose}) {
     {key:"verm_immobilien",label:"Immobilien (Verkehrswert)",placeholder:"0"},
     {key:"verm_bank",label:"Bank- & Sparguthaben",placeholder:"0"},
     {key:"verm_wertpapiere",label:"Wertpapiere / Depot",placeholder:"0"},
-    {key:"verm_bausparer",label:"Bausparvertrag",placeholder:"0"},
-    {key:"verm_versicherung",label:"Lebensversicherung (Rückkaufswert)",placeholder:"0"},
     {key:"verm_sonstiges",label:"Sonstiges Vermögen",placeholder:"0"},
-  ],sumKeys:["verm_immobilien","verm_bank","verm_wertpapiere","verm_bausparer","verm_versicherung","verm_sonstiges"]});
+  ],sumKeys:["verm_immobilien","verm_bank","verm_wertpapiere","verm_sonstiges"]});
 
   steps.push({id:"einsetzbar",type:"text",q:"Wie viel Kapital könntest du einsetzen?",hint:"Einsetzbares Kapital = der Betrag den du bereit bist für den Immobilienkauf zu verwenden.",key:"einsetzbar",placeholder:"30.000"});
 
