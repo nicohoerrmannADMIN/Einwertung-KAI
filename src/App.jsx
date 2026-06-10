@@ -1398,9 +1398,11 @@ function AdminPage(){
                     <div style={{flex:1}}>
                       <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                         <strong>{m.vorname} {m.nachname}</strong>
-                        {m.berater_nr&&(()=>{
-                          const b=beraterList.find(x=>x.nr===m.berater_nr);
-                          const label=b?b.name:m.berater_nr;
+                        {(()=>{
+                          const bnr = m.berater_nr || details[id]?.berater_nr;
+                          if(!bnr) return null;
+                          const b=beraterList.find(x=>x.nr===bnr);
+                          const label=b?b.name:bnr;
                           return <span style={{fontSize:10,color:"#2563eb",background:"#eff6ff",border:"1px solid #bfdbfe",padding:"2px 8px",borderRadius:20,fontWeight:500,whiteSpace:"nowrap"}}>👤 {label}</span>;
                         })()}
                         {d?.crmData&&<span className="badge badge-ok">CRM</span>}
