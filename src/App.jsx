@@ -23,7 +23,7 @@ async function loadMandanten() {
     const rows = await sbFetch("mandanten?select=*&order=created_at.desc");
     if (!rows) return {};
     const obj = {};
-    rows.forEach(r => { obj[r.id] = { vorname: r.vorname, nachname: r.nachname, pin: r.pin, createdAt: r.created_at, berater_nr: r.berater_nr||'' }; });
+    rows.forEach(r => { obj[r.id] = { vorname: r.vorname, nachname: r.nachname, pin: r.pin, createdAt: r.created_at, berater_nr: r.berater_nr||null }; });
     return obj;
   } catch(e) { return {}; }
 }
@@ -1411,7 +1411,7 @@ function AdminPage(){
                       <div style={{fontSize:11,color:"var(--muted)",marginTop:2}}>{getProgress(id)} Schritte</div>
                       <div className="link-s">{genLink(id)}</div>
                       {m.pin&&<div style={{fontSize:12,marginTop:4,color:"var(--ok)",fontWeight:500}}>🔑 PIN: <strong>{m.pin}</strong></div>}
-                      {m.berater_nr&&<div style={{fontSize:11,marginTop:3,color:"#2563eb",fontWeight:500}}>
+                      {m.berater_nr&&m.berater_nr.length>0&&<div style={{fontSize:11,marginTop:3,color:"#2563eb",fontWeight:500}}>
                         {(()=>{const b=beraterList.find(x=>x.nr===m.berater_nr);return b?`👤 ${b.name} (${b.nr})`:`👤 ${m.berater_nr}`;})()}
                       </div>}
                       {m.berater_nr&&(()=>{
