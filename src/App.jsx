@@ -57,9 +57,9 @@ async function getBeraterByNr(nr) {
   return (rows && rows.length > 0) ? rows[0] : null;
 }
 
-async function createMandant(id, vorname, nachname, pin, berater_nr="", berater_name="") {
+async function createMandant(id, vorname, nachname, pin, berater_nr="", berater_name="", berater_email="") {
   await sbFetch("mandanten", "POST", { id, vorname, nachname, pin, berater_nr }, "return=minimal");
-  await sbFetch("mandant_data", "POST", { mandant_id: id, data: { vorname, nachname, pin, berater_nr, berater_name, uploads: {}, selbstauskunft: null, crmData: null, adminData: {} } }, "return=minimal");
+  await sbFetch("mandant_data", "POST", { mandant_id: id, data: { vorname, nachname, pin, berater_nr, berater_name, berater_email, uploads: {}, selbstauskunft: null, crmData: null, adminData: {} } }, "return=minimal");
 }
 async function deleteMandant(id) {
   await sbFetch(`mandant_data?mandant_id=eq.${id}`, "DELETE", null, "return=minimal");
@@ -940,15 +940,8 @@ function MandantPage({mandantId}) {
         window.emailjs.init({publicKey:EMAILJS_PUBLIC});
       }
 
-      // Get berater email directly from Supabase
-      const beraterNrForMail = data?.berater_nr;
-      let toEmail = "nico.hoerrmann91@gmail.com";
-      if(beraterNrForMail){
-        try{
-          const rows = await sbFetch(`berater?nr=eq.${beraterNrForMail}&select=email`);
-          if(rows?.[0]?.email) toEmail = rows[0].email;
-        }catch(e){}
-      }
+      // Use berater_email stored directly in mandant_data - no extra API call
+      const toEmail = data?.berater_email || "nico.hoerrmann91@gmail.com";
       await window.emailjs.send(EMAILJS_SERVICE,EMAILJS_TEMPLATE,{
         title:`Neue Einreichung: ${fullName}`,
         name:fullName,
@@ -1233,7 +1226,7 @@ function AdminPage(){
     const pin = String(Math.floor(10000 + Math.random() * 90000));
     const selBerater = beraterList.find(b=>b.nr===selectedBeraterNr);
     const bName = selBerater?.name||"";
-    await createMandant(id, p[0], p.slice(1).join(" "), pin, selectedBeraterNr, bName);
+    await createMandant(id, p[0], p.slice(1).join(" "), pin, selectedBeraterNr, bName, selBerater?.email||"");
     const nm={...mandanten,[id]:{vorname:p[0],nachname:p.slice(1).join(" "),createdAt:new Date().toISOString(),pin,berater_nr:selectedBeraterNr,berater_name:bName}};
     setMandanten(nm);setName("");setToast(`${t} angelegt ✓`);
   }
