@@ -1431,6 +1431,12 @@ function AdminPage(){
                   {exp&&(
                     <div className="m-detail">
                       <span className="lbl">Persönliche Daten</span>
+                      {m.berater_nr&&(()=>{const b=beraterList.find(x=>x.nr===m.berater_nr);return(
+                        <div style={{marginBottom:12,padding:"8px 12px",background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:6,fontSize:12,color:"#1d4ed8"}}>
+                          👤 Betreuer: <strong>{b?`${b.name} (${b.nr})`:m.berater_nr}</strong>
+                          {b&&<span style={{color:"#6b7280",marginLeft:8}}>{b.email}</span>}
+                        </div>
+                      );})()}
                       <div className="grid2">
                         {[
                           {key:"kundennummer",label:"Kundennummer",src:"crm"},
