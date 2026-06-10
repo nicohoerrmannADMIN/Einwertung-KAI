@@ -1226,8 +1226,10 @@ function AdminPage(){
     if(!selectedBeraterNr){setToast("Bitte zuerst einen Berater auswählen");return;}
     const p=t.split(" ");const id=genId();
     const pin = String(Math.floor(10000 + Math.random() * 90000));
-    await createMandant(id, p[0], p.slice(1).join(" "), pin, newBeraterNr);
-    const nm={...mandanten,[id]:{vorname:p[0],nachname:p.slice(1).join(" "),createdAt:new Date().toISOString(),pin,berater_nr:selectedBeraterNr,berater_name:selBerater?.name||""}};
+    const selBerater = beraterList.find(b=>b.nr===selectedBeraterNr);
+    const bName = selBerater?.name||"";
+    await createMandant(id, p[0], p.slice(1).join(" "), pin, selectedBeraterNr, bName);
+    const nm={...mandanten,[id]:{vorname:p[0],nachname:p.slice(1).join(" "),createdAt:new Date().toISOString(),pin,berater_nr:selectedBeraterNr,berater_name:bName}};
     setMandanten(nm);setName("");setToast(`${t} angelegt ✓`);
   }
 
