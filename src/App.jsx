@@ -1217,6 +1217,7 @@ function AdminPage(){
 
   async function handleCreate(){
     const t=name.trim();if(!t)return;
+    if(!selectedBeraterNr){setToast("Bitte zuerst einen Berater auswählen");return;}
     const p=t.split(" ");const id=genId();
     const pin = String(Math.floor(10000 + Math.random() * 90000));
     await createMandant(id, p[0], p.slice(1).join(" "), pin, newBeraterNr);
@@ -1343,8 +1344,9 @@ function AdminPage(){
           <span className="lbl">Neuen Mandanten anlegen</span>
           <div className="row" style={{flexWrap:"wrap"}}>
             <input className="ifield" placeholder="Max Mustermann" value={name} onChange={e=>setName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleCreate()}/>
-            <select className="ifield" style={{maxWidth:200}} value={selectedBeraterNr} onChange={e=>setSelectedBeraterNr(e.target.value)}>
-              <option value="">Kein Berater zugeordnet</option>
+            <select className="ifield" style={{maxWidth:200}} value={selectedBeraterNr} onChange={e=>setSelectedBeraterNr(e.target.value)}
+              style={{maxWidth:200,borderColor:!selectedBeraterNr?"var(--accent)":"var(--line)"}}>
+              <option value="">– Berater wählen *</option>
               {beraterList.map(b=><option key={b.nr} value={b.nr}>{b.name} ({b.nr})</option>)}
             </select>
             <button className="btn" onClick={handleCreate}>Anlegen →</button>
@@ -1409,9 +1411,9 @@ function AdminPage(){
                       <div style={{fontSize:11,color:"var(--muted)",marginTop:2}}>{getProgress(id)} Schritte</div>
                       <div className="link-s">{genLink(id)}</div>
                       {m.pin&&<div style={{fontSize:12,marginTop:4,color:"var(--ok)",fontWeight:500}}>🔑 PIN: <strong>{m.pin}</strong></div>}
-                      <div style={{fontSize:11,marginTop:3,color:"#2563eb",fontWeight:500}}>
-                        {(()=>{const b=beraterList.find(x=>x.nr===m.berater_nr);return m.berater_nr?(b?`👤 ${b.name} (${b.nr})`:`👤 ${m.berater_nr}`):"👤 Kein Berater";})()}
-                      </div>
+                      {m.berater_nr&&<div style={{fontSize:11,marginTop:3,color:"#2563eb",fontWeight:500}}>
+                        {(()=>{const b=beraterList.find(x=>x.nr===m.berater_nr);return b?`👤 ${b.name} (${b.nr})`:`👤 ${m.berater_nr}`;})()}
+                      </div>}
                       {m.berater_nr&&(()=>{
                         const b=beraterList.find(x=>x.nr===m.berater_nr);
                         const label=b?`${b.name} (${b.nr})`:m.berater_nr;
