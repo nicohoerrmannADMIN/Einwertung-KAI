@@ -7,7 +7,7 @@ const EMAILJS_PUBLIC = "KenDwBUdjTdLSbgM-";
 
 // ── Supabase Storage ───────────────────────────────────────────
 const SB_URL = "https://jtlblbgxzbxjplamdpiu.supabase.co";
-const SB_KEY = "sb_publishable_XZaNy8RC0iATbuq2IVJ0Qg_9qNDsMBd";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp0bGJsYmd4emJ4anBsYW1kcGl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwMzgxNDIsImV4cCI6MjA5NjYxNDE0Mn0.OW11imBD9D8aD6T-nJzLOaCOoXSJY3AWK7uzHj9ft7s";
 
 async function sbFetch(path, method="GET", body=null, prefer="return=representation") {
   const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
