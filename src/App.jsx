@@ -1411,14 +1411,8 @@ function AdminPage(){
                       <div style={{fontSize:11,color:"var(--muted)",marginTop:2}}>{getProgress(id)} Schritte</div>
                       <div className="link-s">{genLink(id)}</div>
                       {m.pin&&<div style={{fontSize:12,marginTop:4,color:"var(--ok)",fontWeight:500}}>🔑 PIN: <strong>{m.pin}</strong></div>}
-                      {m.berater_nr&&m.berater_nr.length>0&&<div style={{fontSize:11,marginTop:3,color:"#2563eb",fontWeight:500}}>
-                        {(()=>{const b=beraterList.find(x=>x.nr===m.berater_nr);return b?`👤 ${b.name} (${b.nr})`:`👤 ${m.berater_nr}`;})()}
-                      </div>}
-                      {m.berater_nr&&(()=>{
-                        const b=beraterList.find(x=>x.nr===m.berater_nr);
-                        const label=b?`${b.name} (${b.nr})`:m.berater_nr;
-                        return <div style={{fontSize:11,marginTop:3,color:"#2563eb",fontWeight:500}}>👤 Berater: {label}</div>;
-                      })()}
+
+
                     </div>
                     <div className="m-acts">
                       <button className="btn btn-o btn-sm" onClick={()=>setExpandedId(exp?null:id)}>{exp?"▲":"Details ▼"}</button>
@@ -1436,12 +1430,7 @@ function AdminPage(){
                   {exp&&(
                     <div className="m-detail">
                       <span className="lbl">Persönliche Daten</span>
-                      {m.berater_nr&&(()=>{const b=beraterList.find(x=>x.nr===m.berater_nr);return(
-                        <div style={{marginBottom:12,padding:"8px 12px",background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:6,fontSize:12,color:"#1d4ed8"}}>
-                          👤 Betreuer: <strong>{b?`${b.name} (${b.nr})`:m.berater_nr}</strong>
-                          {b&&<span style={{color:"#6b7280",marginLeft:8}}>{b.email}</span>}
-                        </div>
-                      );})()}
+
                       <div className="grid2">
                         {[
                           {key:"kundennummer",label:"Kundennummer",src:"crm"},
