@@ -1201,6 +1201,12 @@ function AdminPage(){
   const [bNr,setBNr]=useState('');
   const [bEmail,setBEmail]=useState('');
 
+  function switchAdminTab(tab) {
+    setAdminTab(tab);
+    // Always refresh berater list when switching tabs
+    loadBerater().then(setBeraterList);
+  }
+
   useEffect(()=>{
     loadMandanten().then(m=>{
       setMandanten(m);
@@ -1325,7 +1331,7 @@ function AdminPage(){
       {/* Tabs */}
       <div style={{display:"flex",borderBottom:"1px solid var(--line)",marginBottom:16}}>
         {[["mandanten","Mandanten"],["berater","Berater & Links"]].map(([t,label])=>(
-          <button key={t} onClick={()=>setAdminTab(t)} style={{padding:"10px 18px",background:"none",border:"none",borderBottom:`2px solid ${adminTab===t?"var(--ink)":"transparent"}`,fontFamily:"inherit",fontSize:11,fontWeight:500,cursor:"pointer",color:adminTab===t?"var(--ink)":"var(--muted)",letterSpacing:".08em",textTransform:"uppercase"}}>
+          <button key={t} onClick={()=>switchAdminTab(t)} style={{padding:"10px 18px",background:"none",border:"none",borderBottom:`2px solid ${adminTab===t?"var(--ink)":"transparent"}`,fontFamily:"inherit",fontSize:11,fontWeight:500,cursor:"pointer",color:adminTab===t?"var(--ink)":"var(--muted)",letterSpacing:".08em",textTransform:"uppercase"}}>
             {label}
           </button>
         ))}
@@ -1367,7 +1373,7 @@ function AdminPage(){
               <span style={{fontWeight:600,minWidth:80,fontSize:13}}>{b.nr}</span>
               <span style={{flex:1,fontSize:13}}>{b.name}</span>
               <span style={{color:"var(--muted)",fontSize:12}}>{b.email}</span>
-              <button className="btn btn-o btn-sm" onClick={()=>{navigator.clipboard.writeText(genLink(b.nr));setToast("Link kopiert ✓");}}>🔗 Link kopieren</button>
+
               <button className="btn btn-del btn-sm" onClick={async()=>{if(!window.confirm(`${b.name} löschen?`))return;await deleteBeraterFn(b.nr);loadBerater().then(setBeraterList);}}>Löschen</button>
             </div>
           ))}
@@ -1389,7 +1395,11 @@ function AdminPage(){
                     <div style={{flex:1}}>
                       <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                         <strong>{m.vorname} {m.nachname}</strong>
-                        {m.berater_nr&&(()=>{const b=beraterList.find(x=>x.nr===m.berater_nr);return b?<span style={{fontSize:10,color:"#2563eb",background:"#eff6ff",border:"1px solid #bfdbfe",padding:"2px 8px",borderRadius:20,fontWeight:500,whiteSpace:"nowrap"}}>👤 {b.name}</span>:null;})()}
+                        {m.berater_nr&&(()=>{
+                          const b=beraterList.find(x=>x.nr===m.berater_nr);
+                          const label=b?b.name:m.berater_nr;
+                          return <span style={{fontSize:10,color:"#2563eb",background:"#eff6ff",border:"1px solid #bfdbfe",padding:"2px 8px",borderRadius:20,fontWeight:500,whiteSpace:"nowrap"}}>👤 {label}</span>;
+                        })()}
                         {d?.crmData&&<span className="badge badge-ok">CRM</span>}
                         {d?.adminData?.iban&&<span className="badge badge-ok">IBAN</span>}
                         {d?.selbstauskunft&&<span className="badge badge-ok">SA ✓</span>}
