@@ -1211,7 +1211,15 @@ function AdminPage(){
     Promise.all([loadBerater(), loadMandanten()]).then(([b, m]) => {
       setBeraterList(b);
       setMandanten(m);
-      Object.keys(m).forEach(id=>{ loadMandantData(id).then(d=>{if(d)setDetails(p=>({...p,[id]:d}));}); });
+      Object.keys(m).forEach(id=>{ loadMandantData(id).then(d=>{
+          if(d){
+            setDetails(p=>({...p,[id]:d}));
+            // Sync berater_nr back to mandanten state if missing
+            if(d.berater_nr){
+              setMandanten(p=>({...p,[id]:{...p[id],berater_nr:d.berater_nr}}));
+            }
+          }
+        }); });
     });
   },[]);
 
@@ -1415,9 +1423,10 @@ function AdminPage(){
                       {m.pin&&<div style={{fontSize:12,marginTop:4,color:"var(--ok)",fontWeight:500}}>🔑 PIN: <strong>{m.pin}</strong></div>}
                       {(()=>{
                         const bnr=details[id]?.berater_nr||m.berater_nr;
-                        if(!bnr)return null;
+                        if(!bnr||bnr.length===0)return null;
                         const b=beraterList.find(x=>x.nr===bnr);
-                        return <div style={{fontSize:11,marginTop:3,color:"#2563eb",fontWeight:600}}>👤 {b?b.name:bnr}</div>;
+                        // Always show something - name if loaded, nr as fallback
+                        return <div style={{fontSize:11,marginTop:3,color:"#2563eb",fontWeight:600}}>👤 {b?b.name:`Berater ${bnr}`}</div>;
                       })()}
 
 
