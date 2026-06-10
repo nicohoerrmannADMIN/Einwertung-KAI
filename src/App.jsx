@@ -40,9 +40,26 @@ async function saveMandantData(id, d) {
     await sbFetch("mandant_data", "POST", { mandant_id: id, data: clean }, "resolution=merge-duplicates,return=minimal");
   } catch(e) { console.error(e); }
 }
-async function createMandant(id, vorname, nachname, pin) {
-  await sbFetch("mandanten", "POST", { id, vorname, nachname, pin }, "return=minimal");
-  await sbFetch("mandant_data", "POST", { mandant_id: id, data: { vorname, nachname, pin, uploads: {}, selbstauskunft: null, crmData: null, adminData: {} } }, "return=minimal");
+async function loadBerater() {
+  try {
+    const rows = await sbFetch("berater?select=*&order=name.asc");
+    return rows || [];
+  } catch(e) { return []; }
+}
+async function saveBerater(nr, name, email) {
+  await sbFetch("berater", "POST", { nr, name, email }, "return=minimal");
+}
+async function deleteBeraterFn(nr) {
+  await sbFetch(`berater?nr=eq.${nr}`, "DELETE", null, "return=minimal");
+}
+async function getBeraterByNr(nr) {
+  const rows = await sbFetch(`berater?nr=eq.${nr}&select=*`);
+  return (rows && rows.length > 0) ? rows[0] : null;
+}
+
+async function createMandant(id, vorname, nachname, pin, berater_nr="") {
+  await sbFetch("mandanten", "POST", { id, vorname, nachname, pin, berater_nr }, "return=minimal");
+  await sbFetch("mandant_data", "POST", { mandant_id: id, data: { vorname, nachname, pin, berater_nr, uploads: {}, selbstauskunft: null, crmData: null, adminData: {} } }, "return=minimal");
 }
 async function deleteMandant(id) {
   await sbFetch(`mandant_data?mandant_id=eq.${id}`, "DELETE", null, "return=minimal");
@@ -924,10 +941,17 @@ function MandantPage({mandantId}) {
         window.emailjs.init({publicKey:EMAILJS_PUBLIC});
       }
 
+      // Get berater email if assigned
+      const beraterNrForMail = data?.berater_nr;
+      let toEmail = "nico.hoerrmann91@gmail.com";
+      if(beraterNrForMail){
+        const b = await getBeraterByNr(beraterNrForMail);
+        if(b?.email) toEmail = b.email;
+      }
       await window.emailjs.send(EMAILJS_SERVICE,EMAILJS_TEMPLATE,{
         title:`Neue Einreichung: ${fullName}`,
         name:fullName,
-        email:"einwertung@ks2.de",
+        email:toEmail,
         message:`${fullName} hat alle Unterlagen eingereicht und ist bereit zur Bearbeitung.`,
       });
 
@@ -1170,6 +1194,13 @@ function AdminPage(){
   const [toast,setToast]=useState(null);
   const [details,setDetails]=useState({});
   const [expandedId,setExpandedId]=useState(null);
+  const [beraterList,setBeraterList]=useState([]);
+  const [adminTab,setAdminTab]=useState('mandanten');
+  const [newBeraterNr,setNewBeraterNr]=useState('');
+  const [selectedBeraterNr,setSelectedBeraterNr]=useState('');
+  const [bName,setBName]=useState('');
+  const [bNr,setBNr]=useState('');
+  const [bEmail,setBEmail]=useState('');
 
   useEffect(()=>{
     loadMandanten().then(m=>{
@@ -1182,8 +1213,8 @@ function AdminPage(){
     const t=name.trim();if(!t)return;
     const p=t.split(" ");const id=genId();
     const pin = String(Math.floor(10000 + Math.random() * 90000));
-    await createMandant(id, p[0], p.slice(1).join(" "), pin);
-    const nm={...mandanten,[id]:{vorname:p[0],nachname:p.slice(1).join(" "),createdAt:new Date().toISOString(),pin}};
+    await createMandant(id, p[0], p.slice(1).join(" "), pin, newBeraterNr);
+    const nm={...mandanten,[id]:{vorname:p[0],nachname:p.slice(1).join(" "),createdAt:new Date().toISOString(),pin,berater_nr:newBeraterNr}};
     setMandanten(nm);setName("");setToast(`${t} angelegt ✓`);
   }
 
@@ -1292,13 +1323,57 @@ function AdminPage(){
         <div className="hdr-title">Mandanten<br/><em>verwalten</em></div>
       </div>
 
-      <div className="card">
-        <span className="lbl">Neuen Mandanten anlegen</span>
-        <div className="row">
-          <input className="ifield" placeholder="Max Mustermann" value={name} onChange={e=>setName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleCreate()}/>
-          <button className="btn" onClick={handleCreate}>Anlegen →</button>
-        </div>
+      {/* Tabs */}
+      <div style={{display:"flex",borderBottom:"1px solid var(--line)",marginBottom:16}}>
+        {[["mandanten","Mandanten"],["berater","Berater & Links"]].map(([t,label])=>(
+          <button key={t} onClick={()=>setAdminTab(t)} style={{padding:"10px 18px",background:"none",border:"none",borderBottom:`2px solid ${adminTab===t?"var(--ink)":"transparent"}`,fontFamily:"inherit",fontSize:11,fontWeight:500,cursor:"pointer",color:adminTab===t?"var(--ink)":"var(--muted)",letterSpacing:".08em",textTransform:"uppercase"}}>
+            {label}
+          </button>
+        ))}
       </div>
+
+      {adminTab==="mandanten"&&(
+        <div className="card">
+          <span className="lbl">Neuen Mandanten anlegen</span>
+          <div className="row" style={{flexWrap:"wrap"}}>
+            <input className="ifield" placeholder="Max Mustermann" value={name} onChange={e=>setName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleCreate()}/>
+            <select className="ifield" style={{maxWidth:200}} value={selectedBeraterNr} onChange={e=>setSelectedBeraterNr(e.target.value)}>
+              <option value="">Kein Berater zugeordnet</option>
+              {beraterList.map(b=><option key={b.nr} value={b.nr}>{b.name} ({b.nr})</option>)}
+            </select>
+            <button className="btn" onClick={handleCreate}>Anlegen →</button>
+          </div>
+        </div>
+      )}
+
+      {adminTab==="berater"&&(
+        <div className="card">
+          <span className="lbl">Neuen Berater anlegen</span>
+          <div className="row" style={{flexWrap:"wrap",marginBottom:20}}>
+            <input className="ifield" style={{maxWidth:130}} value={bNr} onChange={e=>setBNr(e.target.value)} placeholder="Partnernr."/>
+            <input className="ifield" value={bName} onChange={e=>setBName(e.target.value)} placeholder="Name"/>
+            <input className="ifield" value={bEmail} onChange={e=>setBEmail(e.target.value)} placeholder="E-Mail" type="email"/>
+            <button className="btn btn-ok" onClick={async()=>{
+              if(!bNr||!bName||!bEmail){setToast("Alle Felder ausfüllen");return;}
+              await saveBerater(bNr.trim(),bName.trim(),bEmail.trim());
+              setBNr("");setBName("");setBEmail("");
+              loadBerater().then(setBeraterList);
+              setToast("Berater angelegt ✓");
+            }}>Anlegen</button>
+          </div>
+          <span className="lbl">Berater-Liste</span>
+          {beraterList.length===0&&<div style={{color:"var(--muted)",fontSize:12,padding:"12px 0"}}>Noch keine Berater angelegt</div>}
+          {beraterList.map(b=>(
+            <div key={b.nr} style={{display:"flex",gap:10,alignItems:"center",padding:"10px 0",borderBottom:"1px solid var(--line)",flexWrap:"wrap"}}>
+              <span style={{fontWeight:600,minWidth:80,fontSize:13}}>{b.nr}</span>
+              <span style={{flex:1,fontSize:13}}>{b.name}</span>
+              <span style={{color:"var(--muted)",fontSize:12}}>{b.email}</span>
+              <button className="btn btn-o btn-sm" onClick={()=>{navigator.clipboard.writeText(genLink(b.nr));setToast("Link kopiert ✓");}}>🔗 Link kopieren</button>
+              <button className="btn btn-del btn-sm" onClick={async()=>{if(!window.confirm(`${b.name} löschen?`))return;await deleteBeraterFn(b.nr);loadBerater().then(setBeraterList);}}>Löschen</button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {Object.keys(mandanten).length>0&&(
         <>
