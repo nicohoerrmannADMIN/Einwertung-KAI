@@ -951,7 +951,7 @@ function MandantPage({mandantId}) {
         title:`Neue Einreichung: ${fullName}`,
         name:fullName,
         email:toEmail,
-        message:`${fullName} hat alle Unterlagen eingereicht und ist bereit zur Bearbeitung.`,
+        message:`${fullName} hat alle Unterlagen eingereicht und ist bereit zur Bearbeitung.\n\nDirekt öffnen: ${genLink(mandantId)}`,
       });
 
       // Mark as eingereicht in storage so admin sees it
