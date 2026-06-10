@@ -1208,7 +1208,8 @@ function AdminPage(){
   }
 
   useEffect(()=>{
-    loadMandanten().then(m=>{
+    Promise.all([loadBerater(), loadMandanten()]).then(([b, m]) => {
+      setBeraterList(b);
       setMandanten(m);
       Object.keys(m).forEach(id=>{ loadMandantData(id).then(d=>{if(d)setDetails(p=>({...p,[id]:d}));}); });
     });
@@ -1408,7 +1409,11 @@ function AdminPage(){
                       <div style={{fontSize:11,color:"var(--muted)",marginTop:2}}>{getProgress(id)} Schritte</div>
                       <div className="link-s">{genLink(id)}</div>
                       {m.pin&&<div style={{fontSize:12,marginTop:4,color:"var(--ok)",fontWeight:500}}>🔑 PIN: <strong>{m.pin}</strong></div>}
-                      {m.berater_nr&&(()=>{const b=beraterList.find(x=>x.nr===m.berater_nr);return b?<div style={{fontSize:11,marginTop:3,color:"#2563eb",fontWeight:500}}>👤 {b.name} ({b.nr})</div>:null;})()}
+                      {m.berater_nr&&(()=>{
+                        const b=beraterList.find(x=>x.nr===m.berater_nr);
+                        const label=b?`${b.name} (${b.nr})`:m.berater_nr;
+                        return <div style={{fontSize:11,marginTop:3,color:"#2563eb",fontWeight:500}}>👤 Berater: {label}</div>;
+                      })()}
                     </div>
                     <div className="m-acts">
                       <button className="btn btn-o btn-sm" onClick={()=>setExpandedId(exp?null:id)}>{exp?"▲":"Details ▼"}</button>
