@@ -942,12 +942,16 @@ function MandantPage({mandantId}) {
 
       // Use berater_email stored directly in mandant_data - no extra API call
       const toEmail = data?.berater_email || "nico.hoerrmann91@gmail.com";
-      await window.emailjs.send(EMAILJS_SERVICE,EMAILJS_TEMPLATE,{
-        title:`Neue Einreichung: ${fullName}`,
-        name:fullName,
-        email:toEmail,
-        to_email:toEmail,
-        message:`${fullName} hat alle Unterlagen eingereicht und ist bereit zur Bearbeitung.\n\nDirekt öffnen: ${genLink(mandantId)}`,
+      console.log("Sending email to:", toEmail);
+      await window.emailjs.send(EMAILJS_SERVICE, EMAILJS_TEMPLATE, {
+        to_email: toEmail,
+        from_name: "KS2 Einwertung",
+        to_name: toEmail,
+        title: `Neue Einreichung: ${fullName}`,
+        name: fullName,
+        email: toEmail,
+        reply_to: toEmail,
+        message: `${fullName} hat alle Unterlagen eingereicht.\n\nDirekt öffnen: ${genLink(mandantId)}`,
       });
 
       // Mark as eingereicht in storage so admin sees it
