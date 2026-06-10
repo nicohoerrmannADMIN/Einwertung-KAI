@@ -23,7 +23,7 @@ async function loadMandanten() {
     const rows = await sbFetch("mandanten?select=*&order=created_at.desc");
     if (!rows) return {};
     const obj = {};
-    rows.forEach(r => { obj[r.id] = { vorname: r.vorname, nachname: r.nachname, pin: r.pin, createdAt: r.created_at }; });
+    rows.forEach(r => { obj[r.id] = { vorname: r.vorname, nachname: r.nachname, pin: r.pin, createdAt: r.created_at, berater_nr: r.berater_nr||'' }; });
     return obj;
   } catch(e) { return {}; }
 }
@@ -424,14 +424,14 @@ body{background:var(--paper);color:var(--ink);font-family:'Inter',system-ui,-app
 .app{max-width:640px;margin:0 auto;padding:40px 20px}
 .hdr{margin-bottom:36px;border-bottom:1px solid var(--ink);padding-bottom:18px}
 .hdr-sub{font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
-.hdr-title{font-family:'DM Serif Display',serif;font-size:28px;line-height:1.1}
+.hdr-title{font-family:'Inter',sans-serif;font-weight:700;font-size:28px;line-height:1.1}
 .hdr-title em{font-style:italic;color:var(--accent)}
 .card{background:var(--cream);border:1px solid var(--line);padding:22px;margin-bottom:16px}
 .lbl{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;display:block}
 .row{display:flex;gap:8px}
 .ifield{flex:1;padding:10px 12px;border:1px solid var(--line);background:var(--paper);font-family:'Inter',system-ui,-apple-system,sans-serif;font-size:13px;color:var(--ink);outline:none;border-radius:var(--r)}
 .ifield:focus{border-color:var(--ink)}
-.btn{padding:10px 20px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);font-family:'DM Mono',monospace;font-size:12px;letter-spacing:.05em;cursor:pointer;border-radius:var(--r);transition:all .15s;white-space:nowrap}
+.btn{padding:10px 20px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);font-family:'Inter',sans-serif;font-size:12px;letter-spacing:.05em;cursor:pointer;border-radius:var(--r);transition:all .15s;white-space:nowrap}
 .btn:hover{background:var(--accent);border-color:var(--accent)}
 .btn:disabled{opacity:.4;cursor:not-allowed}
 .btn-o{background:transparent;color:var(--ink)}
@@ -469,14 +469,14 @@ body{background:var(--paper);color:var(--ink);font-family:'Inter',system-ui,-app
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .link-s{font-size:10px;color:var(--muted);word-break:break-all;margin-top:3px}
 .login-w{max-width:340px;margin:80px auto;padding:0 20px}
-.sa-q{font-family:'DM Serif Display',serif;font-size:22px;margin-bottom:8px;line-height:1.2}
+.sa-q{font-family:'Inter',sans-serif;font-weight:700;font-size:22px;margin-bottom:8px;line-height:1.2}
 .sa-hint{font-size:12px;color:var(--muted);margin-bottom:20px}
 .sa-opts{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
 .sa-opt{padding:14px 16px;border:1px solid var(--line);background:var(--paper);cursor:pointer;text-align:left;font-family:'Inter',system-ui,-apple-system,sans-serif;font-size:13px;border-radius:var(--r);transition:all .15s;width:100%}
 .sa-opt:hover,.sa-opt.sel{border-color:var(--ink);background:var(--cream)}
 .sa-opt.sel{font-weight:500}
 .sa-nav{display:flex;justify-content:space-between;margin-top:20px;gap:10px}
-.sa-num{font-size:18px;padding:14px 16px;border:1px solid var(--line);background:var(--paper);width:100%;font-family:'DM Mono',monospace;border-radius:var(--r);outline:none}
+.sa-num{font-size:18px;padding:14px 16px;border:1px solid var(--line);background:var(--paper);width:100%;font-family:'Inter',sans-serif;border-radius:var(--r);outline:none}
 .sa-num:focus{border-color:var(--ink)}
 .sum-box{background:var(--cream);border:1px solid var(--line);padding:10px 14px;font-size:12px;margin-top:8px;display:flex;justify-content:space-between}
 .sum-val{font-weight:500;color:var(--ok)}
@@ -486,7 +486,7 @@ body{background:var(--paper);color:var(--ink);font-family:'Inter',system-ui,-app
 .consent-text{font-size:12px;line-height:1.6}
 .done-screen{text-align:center;padding:60px 20px}
 .done-icon{font-size:48px;margin-bottom:20px}
-.done-title{font-family:'DM Serif Display',serif;font-size:32px;margin-bottom:12px}
+.done-title{font-family:'Inter',sans-serif;font-weight:700;font-size:32px;margin-bottom:12px}
 .done-sub{color:var(--muted);font-size:14px;line-height:1.6}
 .sign-wrap{border:1px solid var(--line);background:white}
 .sign-canvas{display:block;cursor:crosshair;touch-action:none;width:100%;max-width:500px}
@@ -806,7 +806,7 @@ function MandantPage({mandantId}) {
       <div className="app"><style>{CSS}</style>
         <div style={{maxWidth:320,margin:"80px auto",padding:"0 20px"}}>
           <div className="hdr-sub">KS2 · Einwertungsprozess</div>
-          <div style={{fontFamily:"'DM Serif Display',serif",fontSize:26,marginBottom:20}}>Zugang<br/><em style={{fontStyle:"italic",color:"var(--accent)"}}>bestätigen</em></div>
+          <div style={{fontFamily:"'Inter',sans-serif",fontSize:26,marginBottom:20}}>Zugang<br/><em style={{fontStyle:"italic",color:"var(--accent)"}}>bestätigen</em></div>
           <div style={{fontSize:12,color:"var(--muted)",marginBottom:16}}>Bitte gib den 5-stelligen PIN ein, den du von deinem Berater erhalten hast.</div>
           <input className="ifield" type="number" placeholder="12345" value={pinInput}
             onChange={e=>setPinInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&checkPin()}
@@ -1060,7 +1060,7 @@ function MandantPage({mandantId}) {
       <div className="divider"/>
 
       <div className="card" style={{borderColor:selbstauskunft?"var(--ok)":"var(--line)",background:selbstauskunft?"var(--ok-bg)":"var(--cream)"}}>
-        <div style={{fontFamily:"'DM Serif Display',serif",fontSize:20,marginBottom:4}}>Selbstauskunft</div>
+        <div style={{fontFamily:"'Inter',sans-serif",fontSize:20,marginBottom:4}}>Selbstauskunft</div>
         <div style={{color:"var(--muted)",fontSize:11,marginBottom:14}}>
           {selbstauskunft?"Ausgefüllt und gespeichert.":"Bitte alle Angaben zu Beruf, Einkommen und Vermögen machen."}
         </div>
@@ -1176,7 +1176,7 @@ function AdminLogin({onLogin}){
     <div className="app"><style>{CSS}</style>
       <div className="login-w">
         <div className="hdr-sub">KS2 · Immobilien</div>
-        <div style={{fontFamily:"'DM Serif Display',serif",fontSize:28,marginBottom:24}}>Admin<br/><em style={{fontStyle:"italic",color:"var(--accent)"}}>Zugang</em></div>
+        <div style={{fontFamily:"'Inter',sans-serif",fontSize:28,marginBottom:24}}>Admin<br/><em style={{fontStyle:"italic",color:"var(--accent)"}}>Zugang</em></div>
         <input className="ifield" type="password" placeholder="Passwort" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>e.key==="Enter"&&check()} style={{width:"100%",marginBottom:8,borderColor:err?"var(--accent)":undefined}}/>
         {err&&<div style={{color:"var(--accent)",fontSize:11,marginBottom:8}}>Falsches Passwort</div>}
         <button className="btn" style={{width:"100%"}} onClick={check}>Einloggen →</button>
@@ -1389,6 +1389,7 @@ function AdminPage(){
                     <div style={{flex:1}}>
                       <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                         <strong>{m.vorname} {m.nachname}</strong>
+                        {m.berater_nr&&(()=>{const b=beraterList.find(x=>x.nr===m.berater_nr);return b?<span style={{fontSize:10,color:"#2563eb",background:"#eff6ff",border:"1px solid #bfdbfe",padding:"2px 8px",borderRadius:20,fontWeight:500,whiteSpace:"nowrap"}}>👤 {b.name}</span>:null;})()}
                         {d?.crmData&&<span className="badge badge-ok">CRM</span>}
                         {d?.adminData?.iban&&<span className="badge badge-ok">IBAN</span>}
                         {d?.selbstauskunft&&<span className="badge badge-ok">SA ✓</span>}
