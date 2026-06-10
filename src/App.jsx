@@ -57,9 +57,9 @@ async function getBeraterByNr(nr) {
   return (rows && rows.length > 0) ? rows[0] : null;
 }
 
-async function createMandant(id, vorname, nachname, pin, berater_nr="") {
+async function createMandant(id, vorname, nachname, pin, berater_nr="", berater_name="") {
   await sbFetch("mandanten", "POST", { id, vorname, nachname, pin, berater_nr }, "return=minimal");
-  await sbFetch("mandant_data", "POST", { mandant_id: id, data: { vorname, nachname, pin, berater_nr, uploads: {}, selbstauskunft: null, crmData: null, adminData: {} } }, "return=minimal");
+  await sbFetch("mandant_data", "POST", { mandant_id: id, data: { vorname, nachname, pin, berater_nr, berater_name, uploads: {}, selbstauskunft: null, crmData: null, adminData: {} } }, "return=minimal");
 }
 async function deleteMandant(id) {
   await sbFetch(`mandant_data?mandant_id=eq.${id}`, "DELETE", null, "return=minimal");
@@ -940,17 +940,15 @@ function MandantPage({mandantId}) {
         window.emailjs.init({publicKey:EMAILJS_PUBLIC});
       }
 
-      // Get berater email if assigned
+      // Get berater email from beraterList (already loaded in state)
       const beraterNrForMail = data?.berater_nr;
-      let toEmail = "nico.hoerrmann91@gmail.com";
-      if(beraterNrForMail){
-        const b = await getBeraterByNr(beraterNrForMail);
-        if(b?.email) toEmail = b.email;
-      }
+      const beraterForMail = beraterList?.find(b=>b.nr===beraterNrForMail);
+      const toEmail = beraterForMail?.email || "nico.hoerrmann91@gmail.com";
       await window.emailjs.send(EMAILJS_SERVICE,EMAILJS_TEMPLATE,{
         title:`Neue Einreichung: ${fullName}`,
         name:fullName,
         email:toEmail,
+        to_email:toEmail,
         message:`${fullName} hat alle Unterlagen eingereicht und ist bereit zur Bearbeitung.\n\nDirekt öffnen: ${genLink(mandantId)}`,
       });
 
@@ -1214,9 +1212,9 @@ function AdminPage(){
       Object.keys(m).forEach(id=>{ loadMandantData(id).then(d=>{
           if(d){
             setDetails(p=>({...p,[id]:d}));
-            // Sync berater_nr back to mandanten state if missing
-            if(d.berater_nr){
-              setMandanten(p=>({...p,[id]:{...p[id],berater_nr:d.berater_nr}}));
+            // Sync berater info back to mandanten state
+            if(d.berater_nr||d.berater_name){
+              setMandanten(p=>({...p,[id]:{...p[id],berater_nr:d.berater_nr,berater_name:d.berater_name}}));
             }
           }
         }); });
@@ -1229,7 +1227,7 @@ function AdminPage(){
     const p=t.split(" ");const id=genId();
     const pin = String(Math.floor(10000 + Math.random() * 90000));
     await createMandant(id, p[0], p.slice(1).join(" "), pin, newBeraterNr);
-    const nm={...mandanten,[id]:{vorname:p[0],nachname:p.slice(1).join(" "),createdAt:new Date().toISOString(),pin,berater_nr:selectedBeraterNr}};
+    const nm={...mandanten,[id]:{vorname:p[0],nachname:p.slice(1).join(" "),createdAt:new Date().toISOString(),pin,berater_nr:selectedBeraterNr,berater_name:selBerater?.name||""}};
     setMandanten(nm);setName("");setToast(`${t} angelegt ✓`);
   }
 
@@ -1415,11 +1413,12 @@ function AdminPage(){
                       <div className="link-s">{genLink(id)}</div>
                       {m.pin&&<div style={{fontSize:12,marginTop:4,color:"var(--ok)",fontWeight:500}}>🔑 PIN: <strong>{m.pin}</strong></div>}
                       {(()=>{
-                        const bnr=details[id]?.berater_nr||m.berater_nr;
-                        if(!bnr||bnr.length===0)return null;
-                        const b=beraterList.find(x=>x.nr===bnr);
-                        // Always show something - name if loaded, nr as fallback
-                        return <div style={{fontSize:11,marginTop:3,color:"#2563eb",fontWeight:600}}>👤 {b?b.name:`Berater ${bnr}`}</div>;
+                        // Use berater_name directly from data - most reliable
+                        const bname = m.berater_name || details[id]?.berater_name;
+                        const bnr = m.berater_nr || details[id]?.berater_nr;
+                        const label = bname || bnr;
+                        if(!label) return null;
+                        return <div style={{fontSize:11,marginTop:3,color:"#2563eb",fontWeight:600}}>👤 {label}</div>;
                       })()}
 
 
