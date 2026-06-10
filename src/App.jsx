@@ -940,10 +940,15 @@ function MandantPage({mandantId}) {
         window.emailjs.init({publicKey:EMAILJS_PUBLIC});
       }
 
-      // Get berater email from beraterList (already loaded in state)
+      // Get berater email directly from Supabase
       const beraterNrForMail = data?.berater_nr;
-      const beraterForMail = beraterList?.find(b=>b.nr===beraterNrForMail);
-      const toEmail = beraterForMail?.email || "nico.hoerrmann91@gmail.com";
+      let toEmail = "nico.hoerrmann91@gmail.com";
+      if(beraterNrForMail){
+        try{
+          const rows = await sbFetch(`berater?nr=eq.${beraterNrForMail}&select=email`);
+          if(rows?.[0]?.email) toEmail = rows[0].email;
+        }catch(e){}
+      }
       await window.emailjs.send(EMAILJS_SERVICE,EMAILJS_TEMPLATE,{
         title:`Neue Einreichung: ${fullName}`,
         name:fullName,
