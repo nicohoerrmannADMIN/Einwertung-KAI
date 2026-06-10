@@ -1221,7 +1221,7 @@ function AdminPage(){
     const p=t.split(" ");const id=genId();
     const pin = String(Math.floor(10000 + Math.random() * 90000));
     await createMandant(id, p[0], p.slice(1).join(" "), pin, newBeraterNr);
-    const nm={...mandanten,[id]:{vorname:p[0],nachname:p.slice(1).join(" "),createdAt:new Date().toISOString(),pin,berater_nr:newBeraterNr}};
+    const nm={...mandanten,[id]:{vorname:p[0],nachname:p.slice(1).join(" "),createdAt:new Date().toISOString(),pin,berater_nr:selectedBeraterNr}};
     setMandanten(nm);setName("");setToast(`${t} angelegt ✓`);
   }
 
