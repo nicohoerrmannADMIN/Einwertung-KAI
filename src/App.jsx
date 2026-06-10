@@ -1413,6 +1413,12 @@ function AdminPage(){
                       <div style={{fontSize:11,color:"var(--muted)",marginTop:2}}>{getProgress(id)} Schritte</div>
                       <div className="link-s">{genLink(id)}</div>
                       {m.pin&&<div style={{fontSize:12,marginTop:4,color:"var(--ok)",fontWeight:500}}>🔑 PIN: <strong>{m.pin}</strong></div>}
+                      {(()=>{
+                        const bnr=details[id]?.berater_nr||m.berater_nr;
+                        if(!bnr)return null;
+                        const b=beraterList.find(x=>x.nr===bnr);
+                        return <div style={{fontSize:11,marginTop:3,color:"#2563eb",fontWeight:600}}>👤 {b?b.name:bnr}</div>;
+                      })()}
 
 
                     </div>
