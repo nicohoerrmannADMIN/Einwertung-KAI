@@ -430,7 +430,7 @@ body{background:#f1f5f9;color:var(--ink);font-family:'Inter',system-ui,-apple-sy
 .lbl{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;display:block}
 .row{display:flex;gap:8px}
 .ifield{flex:1;padding:10px 12px;border:1px solid var(--line);background:var(--paper);font-family:'Inter',system-ui,-apple-system,sans-serif;font-size:13px;color:var(--ink);outline:none;border-radius:var(--r)}
-.ifield:focus{border-color:var(--ink)}
+.ifield:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.1)}
 .btn{padding:10px 20px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);font-family:'Inter',sans-serif;font-size:12px;letter-spacing:.05em;cursor:pointer;border-radius:var(--r);transition:all .15s;white-space:nowrap}
 .btn:hover{background:var(--accent);border-color:var(--accent)}
 .btn:disabled{opacity:.4;cursor:not-allowed}
@@ -532,8 +532,9 @@ body{background:#f1f5f9;color:var(--ink);font-family:'Inter',system-ui,-apple-sy
   .divider{margin:16px 0}
   .file-list{padding:0 10px 8px 28px}
 }
+
+  
 `;
-  .ifield:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.1)}
 
 // ── Toast ────────────────────────────────────────────────────────
 function Toast({msg,onDone}) {
