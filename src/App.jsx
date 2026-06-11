@@ -419,10 +419,10 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
 // ── CSS ──────────────────────────────────────────────────────────
 const CSS = `
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{--ink:#0f0e0c;--paper:#f5f2ed;--cream:#ede9e2;--accent:#c8401a;--muted:#8a8680;--line:#d4cfc7;--ok:#2d6a4f;--ok-bg:#e8f4ef;--r:2px}
-body{background:var(--paper);color:var(--ink);font-family:'Inter',system-ui,-apple-system,sans-serif;font-size:13px;min-height:100vh}
+:root{--ink:#0f0e0c;--paper:#f5f2ed;--cream:#ede9e2;--accent:#c8401a;--muted:#8a8680;--line:#d4cfc7;--ok:#2d6a4f;--ok-bg:#e8f4ef;--r:8px}
+body{background:#f1f5f9;color:var(--ink);font-family:'Inter',system-ui,-apple-system,sans-serif;font-size:13px;min-height:100vh}
 .app{max-width:640px;margin:0 auto;padding:40px 20px}
-.hdr{margin-bottom:36px;border-bottom:1px solid var(--ink);padding-bottom:18px}
+.hdr{margin-bottom:32px;border-bottom:2px solid #2563eb;padding-bottom:16px;background:#fff;padding:20px 24px;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
 .hdr-sub{font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
 .hdr-title{font-family:'Inter',sans-serif;font-weight:700;font-size:28px;line-height:1.1}
 .hdr-title em{font-style:italic;color:var(--accent)}
@@ -468,7 +468,7 @@ body{background:var(--paper);color:var(--ink);font-family:'Inter',system-ui,-app
 .fg{display:flex;flex-direction:column;gap:3px;margin-bottom:12px}.fg .lbl{font-size:9px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase;margin-bottom:2px;padding-bottom:2px;border-bottom:1px solid var(--line)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .link-s{font-size:10px;color:var(--muted);word-break:break-all;margin-top:3px}
-.login-w{max-width:340px;margin:80px auto;padding:0 20px}
+.login-w{max-width:360px;margin:80px auto;padding:32px;background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.08)}
 .sa-q{font-family:'Inter',sans-serif;font-weight:700;font-size:22px;margin-bottom:8px;line-height:1.2}
 .sa-hint{font-size:12px;color:var(--muted);margin-bottom:20px}
 .sa-opts{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
@@ -533,6 +533,7 @@ body{background:var(--paper);color:var(--ink);font-family:'Inter',system-ui,-app
   .file-list{padding:0 10px 8px 28px}
 }
 `;
+  .ifield:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.1)}
 
 // ── Toast ────────────────────────────────────────────────────────
 function Toast({msg,onDone}) {
@@ -772,10 +773,10 @@ function SAWizard({crmData, adminData, existing, onSave, onClose}) {
 // ── Dokument Kategorien ──────────────────────────────────────────
 const DOCS = [
   {id:"eigenkapital",label:"Eigenkapitalnachweis",sublabel:"Kontoauszug oder Depotauszug",hint:"Name, Datum und Vermögensbetrag in € müssen auf der gleichen Seite erkennbar sein.",required:true,canHaveAlready:true},
-  {id:"steuerbescheid",label:"Steuerbescheid",sublabel:"Aktuellster vorliegender Bescheid",hint:null,required:true,noDoc:true,noDocLabel:"Kein Steuerbescheid vorhanden (keine Steuererklärung abgegeben)",canHaveAlready:true},
-  {id:"lohn1",label:"Gehaltsnachweis",sublabel:"Letzter vollständiger Monat",hint:"Foto direkt mit der Kamera möglich.",required:true,camera:true,canHaveAlready:true},
-  {id:"lohn2",label:"Gehaltsnachweis",sublabel:"Vorletzter vollständiger Monat",hint:null,required:true,camera:true,canHaveAlready:true},
-  {id:"lohn3",label:"Gehaltsnachweis",sublabel:"Drittletzter vollständiger Monat",hint:null,required:true,camera:true,canHaveAlready:true},
+  {id:"steuerbescheid",label:"Steuerbescheid",sublabel:"Aktuellster vorliegender Bescheid",hint:"Wichtig: alle Seiten hochladen – auch die letzte Seite mit dem Stempel des Finanzamts.",required:true,noDoc:true,noDocLabel:"Kein Steuerbescheid vorhanden (keine Steuererklärung abgegeben)",canHaveAlready:true,camera:true},
+  {id:"lohn1",label:"Gehaltsnachweis / Lohnzettel",sublabel:"Letzter vollständiger Monat",hint:"Foto direkt mit der Kamera möglich.",required:true,camera:true,canHaveAlready:true},
+  {id:"lohn2",label:"Gehaltsnachweis / Lohnzettel",sublabel:"Vorletzter vollständiger Monat",hint:null,required:true,camera:true,canHaveAlready:true},
+  {id:"lohn3",label:"Gehaltsnachweis / Lohnzettel",sublabel:"Drittletzter vollständiger Monat",hint:null,required:true,camera:true,canHaveAlready:true},
 ];
 
 // ── Mandant Page ─────────────────────────────────────────────────
