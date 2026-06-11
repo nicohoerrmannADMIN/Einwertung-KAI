@@ -496,9 +496,9 @@ select.ifield option{background:#1a1a24;color:#fff}
 .sum-val{font-weight:700;color:var(--accent);font-size:18px;letter-spacing:-.01em}
 .sum-box span:first-child{color:var(--muted);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 
-.upl-item{border:1px solid rgba(201,168,76,.2);background:linear-gradient(135deg,#1a1a24 0%,#14141c 100%);margin-bottom:12px;border-radius:14px;overflow:hidden;transition:all .2s;box-shadow:0 2px 12px rgba(0,0,0,.4)}
-.upl-item:hover{border-color:rgba(201,168,76,.5);box-shadow:0 4px 24px rgba(201,168,76,.1)}
-.upl-hdr{display:flex;align-items:flex-start;justify-content:space-between;padding:20px;gap:14px;border-bottom:1px solid rgba(255,255,255,.05)}
+.upl-item{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);margin-bottom:12px;border-radius:14px;overflow:hidden;transition:all .2s}
+.upl-item:hover{border-color:rgba(201,168,76,.4);background:rgba(255,255,255,.08)}
+.upl-hdr{display:flex;align-items:flex-start;justify-content:space-between;padding:20px;gap:14px;border-bottom:1px solid rgba(255,255,255,.06)}
 .upl-dot{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,.15);flex-shrink:0;margin-top:5px;transition:background .2s;border:1px solid rgba(255,255,255,.1)}
 .upl-lbl{font-size:15px;font-weight:700;letter-spacing:-.01em;color:#fff}
 .upl-sub{font-size:12px;color:rgba(255,255,255,.5);margin-top:4px}
