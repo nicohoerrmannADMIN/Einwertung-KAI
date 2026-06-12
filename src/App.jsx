@@ -1151,14 +1151,16 @@ function MandantPage({mandantId}) {
 
       <div className="divider"/>
 
-      <div className="card" style={{borderColor:selbstauskunft?"var(--ok)":"var(--line)",background:selbstauskunft?"var(--ok-bg)":"var(--cream)"}}>
-        <div style={{fontFamily:"'Inter',sans-serif",fontSize:20,marginBottom:4}}>Selbstauskunft</div>
+      <div className="card" style={selbstauskunft
+        ?{borderColor:"var(--ok-b)",background:"var(--ok-bg)"}
+        :{borderColor:"var(--gold-b)",background:"var(--gold-l)",boxShadow:"0 0 0 1px var(--gold-b), 0 0 24px -10px var(--gold-b)"}}>
+        <div style={{fontFamily:"var(--serif)",fontSize:22,marginBottom:4,fontWeight:600}}>Selbstauskunft</div>
         <div style={{color:"var(--muted)",fontSize:11,marginBottom:14}}>
           {selbstauskunft?"Ausgefüllt und gespeichert.":"Bitte alle Angaben zu Beruf, Einkommen und Vermögen machen."}
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
           {selbstauskunft&&<span className="badge badge-ok">✓ Ausgefüllt</span>}
-          <button className="btn btn-o btn-sm" onClick={()=>setShowSA(true)}>{selbstauskunft?"Bearbeiten":"Ausfüllen →"}</button>
+          <button className={selbstauskunft?"btn btn-o btn-sm":"btn btn-ok btn-sm"} onClick={()=>setShowSA(true)}>{selbstauskunft?"Bearbeiten":"Jetzt ausfüllen →"}</button>
           {selbstauskunft&&<button className="btn btn-o btn-sm" onClick={handleDownloadSA}>📄 PDF herunterladen</button>}
         </div>
       </div>
@@ -1506,7 +1508,6 @@ function AdminPage(){
                         {d?.eingereicht&&<span className="badge badge-ok" style={{background:"var(--ok)",color:"white"}}>✓ Eingereicht</span>}
                       </div>
                       <div style={{fontSize:11,color:"var(--muted)",marginTop:2}}>{getProgress(id)} Schritte</div>
-                      <div className="link-s">{genLink(id)}</div>
                       {m.pin&&<div style={{fontSize:12,marginTop:4,color:"var(--ok)",fontWeight:500}}>🔑 PIN: <strong>{m.pin}</strong></div>}
                       {(()=>{
                         // Use berater_name directly from data - most reliable
