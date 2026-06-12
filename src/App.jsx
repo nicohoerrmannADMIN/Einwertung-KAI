@@ -430,8 +430,8 @@ const CSS = `
   --gold:#E0A82E;
   --gold-l:rgba(224,168,46,.10);
   --gold-b:rgba(224,168,46,.35);
-  --steel:#3D5A80;
-  --steel-l:rgba(61,90,128,.14);
+  --steel:#E0A82E;
+  --steel-l:rgba(224,168,46,.14);
   --ok:#3FB68B;
   --ok-bg:rgba(63,182,139,.10);
   --ok-b:rgba(63,182,139,.4);
@@ -446,7 +446,7 @@ const CSS = `
   --cream:rgba(255,255,255,.02);
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
-body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;min-height:100vh;background-image:radial-gradient(circle at 15% 0%, rgba(61,90,128,.10), transparent 45%),radial-gradient(circle at 85% 100%, rgba(201,162,39,.06), transparent 50%)}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;min-height:100vh;background-image:radial-gradient(circle at 15% 0%, rgba(224,168,46,.06), transparent 45%),radial-gradient(circle at 85% 100%, rgba(224,168,46,.06), transparent 50%)}
 
 .app{max-width:760px;margin:0 auto;padding:48px 28px 100px}
 
@@ -527,7 +527,7 @@ select.ifield option{background:#141A24}
 @keyframes pulse-gold{0%,100%{box-shadow:0 0 0 0 var(--gold-b)}50%{box-shadow:0 0 0 6px transparent}}
 
 .upl-hdr{display:flex;align-items:flex-start;justify-content:space-between;padding:18px 20px;gap:14px}
-.upl-item.done .upl-hdr{border-bottom:1px solid var(--ok-b)}
+.upl-item.done .upl-hdr{border-bottom:none}
 .upl-item:not(.done) .upl-hdr{border-bottom:1px solid var(--border)}
 
 .upl-num{
