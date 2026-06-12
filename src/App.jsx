@@ -427,9 +427,9 @@ const CSS = `
   --border:rgba(255,255,255,.08);
   --ink:#F5F1E8;
   --muted:rgba(245,241,232,.48);
-  --gold:#C9A227;
-  --gold-l:rgba(201,162,39,.10);
-  --gold-b:rgba(201,162,39,.32);
+  --gold:#E0A82E;
+  --gold-l:rgba(224,168,46,.10);
+  --gold-b:rgba(224,168,46,.35);
   --steel:#3D5A80;
   --steel-l:rgba(61,90,128,.14);
   --ok:#3FB68B;
@@ -564,7 +564,6 @@ select.ifield option{background:#141A24}
   color:var(--ok);background:var(--ok-bg);border:1px solid var(--ok-b);
   padding:4px 10px;border-radius:4px;text-transform:uppercase;
   display:inline-flex;align-items:center;gap:6px;flex-shrink:0;
-  transform:rotate(-2deg);
 }
 
 .badge{display:inline-block;padding:3px 10px;font-family:var(--mono);font-size:10px;border-radius:3px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
