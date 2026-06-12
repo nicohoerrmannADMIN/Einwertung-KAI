@@ -1498,10 +1498,10 @@ function AdminPage(){
                   borderColor: d?.eingereicht ? "var(--ok)" : "var(--line)",
                   background: d?.eingereicht ? "var(--ok-bg)" : "var(--paper)"
                 }}>
-                  <div className="m-row">
+                  <div className="m-row" style={{paddingTop:18}}>
                     <div style={{flex:1}}>
                       <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                        <strong>{m.vorname} {m.nachname}</strong>
+                        <strong style={{fontSize:18,fontFamily:"var(--serif)",fontWeight:600}}>{m.vorname} {m.nachname}</strong>
                         {d?.crmData&&<span className="badge badge-ok">CRM</span>}
                         {d?.adminData?.iban&&<span className="badge badge-ok">IBAN</span>}
                         {d?.selbstauskunft&&<span className="badge badge-ok">SA ✓</span>}
