@@ -768,7 +768,7 @@ function SAWizard({crmData, adminData, existing, onSave, onClose}) {
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(15,14,12,0.85)",overflowY:"auto",zIndex:100,padding:"20px"}}>
-      <div style={{background:"var(--paper)",maxWidth:560,margin:"0 auto",border:"1px solid var(--ink)",padding:"28px 24px"}}>
+      <div style={{background:"var(--surface)",maxWidth:560,margin:"0 auto",border:"1px solid var(--gold-b)",borderRadius:8,padding:"28px 24px",boxShadow:"0 0 0 1px var(--gold-b), 0 0 40px -12px var(--gold-b)"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
           <div style={{fontSize:11,color:"var(--muted)"}}>Schritt {step+1} von {total}</div>
           <button onClick={onClose} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:"var(--muted)"}}>×</button>
