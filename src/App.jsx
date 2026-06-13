@@ -9,14 +9,29 @@ const EMAILJS_PUBLIC = "KenDwBUdjTdLSbgM-";
 const SB_URL = "https://jtlblbgxzbxjplamdpiu.supabase.co";
 const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp0bGJsYmd4emJ4anBsYW1kcGl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwMzgxNDIsImV4cCI6MjA5NjYxNDE0Mn0.OW11imBD9D8aD6T-nJzLOaCOoXSJY3AWK7uzHj9ft7s";
 
+let accessToken = null;
+function setAccessToken(t){ accessToken = t; }
+function authHeaders(extra={}) {
+  return { "apikey": SB_KEY, "Authorization": `Bearer ${accessToken || SB_KEY}`, ...extra };
+}
 async function sbFetch(path, method="GET", body=null, prefer="return=representation") {
   const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
     method,
-    headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Content-Type": "application/json", "Prefer": prefer },
+    headers: authHeaders({ "Content-Type": "application/json", "Prefer": prefer }),
     body: body ? JSON.stringify(body) : undefined
   });
   if (!res.ok) { console.error("SB:", res.status, await res.text()); return null; }
   const t = await res.text(); return t ? JSON.parse(t) : null;
+}
+async function supaLogin(email, password) {
+  const res = await fetch(`${SB_URL}/auth/v1/token?grant_type=password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "apikey": SB_KEY },
+    body: JSON.stringify({ email, password })
+  });
+  const json = await res.json();
+  if (!res.ok || !json.access_token) return null;
+  return json.access_token;
 }
 async function loadMandanten() {
   try {
@@ -418,182 +433,121 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
 
 // ── CSS ──────────────────────────────────────────────────────────
 const CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
-
 :root{
-  --bg:#0B0E14;
-  --surface:#141A24;
-  --card:#1B2330;
-  --border:rgba(255,255,255,.08);
-  --ink:#F5F1E8;
-  --muted:rgba(245,241,232,.48);
-  --gold:#E0A82E;
-  --gold-l:rgba(224,168,46,.10);
-  --gold-b:rgba(224,168,46,.35);
-  --steel:#E0A82E;
-  --steel-l:rgba(224,168,46,.14);
-  --ok:#3FB68B;
-  --ok-bg:rgba(63,182,139,.10);
-  --ok-b:rgba(63,182,139,.4);
-  --red:#D9534F;
-  --red-bg:rgba(217,83,79,.1);
-  --serif:'Fraunces',Georgia,serif;
-  --sans:'Inter',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;
-  --mono:'JetBrains Mono',ui-monospace,monospace;
-  --paper:var(--surface);
-  --line:var(--border);
-  --accent:var(--red);
-  --cream:rgba(255,255,255,.02);
+  --bg:#141414;
+  --surface:#1f1f1f;
+  --card:#2a2a2a;
+  --border:rgba(255,255,255,.1);
+  --ink:#ffffff;
+  --muted:rgba(255,255,255,.5);
+  --gold:#c9a84c;
+  --gold-l:rgba(201,168,76,.12);
+  --gold-b:rgba(201,168,76,.3);
+  --ok:#46d369;
+  --ok-bg:rgba(70,211,105,.1);
+  --red:#e50914;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
-body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;min-height:100vh;background-image:radial-gradient(circle at 15% 0%, rgba(224,168,46,.06), transparent 45%),radial-gradient(circle at 85% 100%, rgba(224,168,46,.06), transparent 50%)}
+body{background:var(--bg);color:var(--ink);font-family:'Netflix Sans',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;font-size:14px;line-height:1.5;min-height:100vh}
 
 .app{max-width:760px;margin:0 auto;padding:48px 28px 100px}
 
-.hdr{margin-bottom:52px;border-bottom:1px solid var(--border);padding-bottom:24px}
-.hdr-sub{font-family:var(--mono);font-size:10px;letter-spacing:.25em;text-transform:uppercase;color:var(--steel);margin-bottom:14px;font-weight:600}
-.hdr-title{font-family:var(--serif);font-size:46px;font-weight:600;line-height:1.05;letter-spacing:-.02em;color:#fff}
-.hdr-title em{font-style:italic;color:var(--gold);font-weight:500}
+.hdr{margin-bottom:52px}
+.hdr-sub{font-size:10px;letter-spacing:.25em;text-transform:uppercase;color:var(--gold);margin-bottom:12px;font-weight:600}
+.hdr-title{font-size:42px;font-weight:900;line-height:1.0;letter-spacing:-.04em;color:#fff}
+.hdr-title em{font-style:normal;color:var(--gold)}
 
-.card{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:24px;margin-bottom:12px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:24px;margin-bottom:12px}
 
-.m-item{background:var(--surface);border:1px solid var(--border);border-radius:6px;margin-bottom:10px;overflow:hidden;transition:all .2s;position:relative}
-.m-item:hover{border-color:rgba(255,255,255,.2)}
+.m-item{background:var(--surface);border:1px solid var(--border);border-radius:4px;margin-bottom:10px;overflow:hidden;transition:all .2s}
+.m-item:hover{border-color:rgba(255,255,255,.25);background:#252525}
 .m-hdr{padding:20px 22px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px}
 .m-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:0 22px 18px}
 .m-acts{display:flex;gap:6px;flex-wrap:wrap}
 .m-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.2);flex-shrink:0}
 .m-dot.exp{background:var(--gold)}
-.m-detail{padding:20px 22px;border-top:1px solid var(--border);background:rgba(0,0,0,.25)}
+.m-detail{padding:20px 22px;border-top:1px solid var(--border);background:rgba(0,0,0,.3)}
 
-.btn{display:inline-flex;align-items:center;gap:6px;padding:11px 24px;border:none;background:var(--ink);color:#0B0E14;font-size:13px;font-family:var(--sans);cursor:pointer;letter-spacing:.02em;border-radius:4px;font-weight:700;transition:all .15s;text-decoration:none;white-space:nowrap}
-.btn:hover{background:#fff}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:11px 24px;border:none;background:#fff;color:#000;font-size:13px;font-family:inherit;cursor:pointer;letter-spacing:.02em;border-radius:3px;font-weight:700;transition:all .15s;text-decoration:none;white-space:nowrap}
+.btn:hover{background:rgba(255,255,255,.85)}
 .btn:active{transform:scale(.97)}
-.btn-o{background:rgba(255,255,255,.06);color:var(--ink);border:1px solid rgba(255,255,255,.18)}
-.btn-o:hover{background:rgba(255,255,255,.12)}
-.btn-ok{background:var(--gold);color:#1a1306;font-weight:800}
-.btn-ok:hover{background:#dfb52e}
-.btn-del{background:var(--red-bg);color:var(--red);border:1px solid rgba(217,83,79,.3)}
-.btn-del:hover{background:rgba(217,83,79,.2)}
+.btn-o{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.25)}
+.btn-o:hover{background:rgba(255,255,255,.15)}
+.btn-ok{background:var(--gold);color:#000;font-weight:800}
+.btn-ok:hover{background:#b8932e}
+.btn-del{background:rgba(229,9,20,.1);color:var(--red);border:1px solid rgba(229,9,20,.3)}
+.btn-del:hover{background:rgba(229,9,20,.2)}
 .btn-sm{padding:6px 14px;font-size:11px}
 .btn:disabled{opacity:.3;cursor:not-allowed}
 
-.ifield{border:1px solid rgba(255,255,255,.12);padding:12px 16px;font-size:14px;font-family:var(--sans);background:rgba(255,255,255,.04);color:var(--ink);outline:none;border-radius:4px;transition:all .15s;width:100%}
-.ifield:focus{border-color:var(--gold);background:rgba(255,255,255,.07)}
-.ifield::placeholder{color:rgba(245,241,232,.28)}
-select.ifield option{background:#141A24}
+.ifield{border:1px solid rgba(255,255,255,.15);padding:12px 16px;font-size:14px;font-family:inherit;background:rgba(255,255,255,.07);color:#fff;outline:none;border-radius:3px;transition:all .15s;width:100%}
+.ifield:focus{border-color:var(--gold);background:rgba(255,255,255,.1)}
+.ifield::placeholder{color:rgba(255,255,255,.3)}
+select.ifield option{background:#1f1f1f}
 
-.lbl{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.18em;text-transform:uppercase;margin-bottom:6px;display:block;font-weight:600}
+.lbl{font-size:10px;color:var(--muted);letter-spacing:.15em;text-transform:uppercase;margin-bottom:6px;display:block;font-weight:600}
 .fg .lbl{border-bottom:1px solid var(--border);padding-bottom:4px}
 
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .fg{display:flex;flex-direction:column;gap:4px;margin-bottom:4px}
 
-.pg-bar{height:2px;background:rgba(255,255,255,.08);margin-bottom:32px;overflow:hidden;border-radius:1px}
-.pg-fill{height:100%;background:linear-gradient(90deg,var(--steel),var(--gold));transition:width .4s ease}
-.pg-hdr{font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:8px;display:flex;justify-content:space-between;font-weight:600;letter-spacing:.15em;text-transform:uppercase}
+.pg-bar{height:2px;background:rgba(255,255,255,.1);margin-bottom:32px;overflow:hidden}
+.pg-fill{height:100%;background:var(--gold);transition:width .4s ease}
+.pg-hdr{font-size:10px;color:var(--muted);margin-bottom:8px;display:flex;justify-content:space-between;font-weight:600;letter-spacing:.12em;text-transform:uppercase}
 
-.sa-q{font-family:var(--serif);font-size:32px;font-weight:600;line-height:1.2;letter-spacing:-.01em;margin-bottom:8px}
+.sa-q{font-size:30px;font-weight:900;line-height:1.15;letter-spacing:-.03em;margin-bottom:8px}
 .sa-hint{font-size:14px;color:var(--muted);margin-bottom:28px;line-height:1.7}
 .sa-opts{display:flex;flex-direction:column;gap:8px;margin-bottom:20px}
-.sa-opt{border:1px solid rgba(255,255,255,.1);padding:15px 20px;text-align:left;width:100%;font-family:var(--sans);font-size:15px;cursor:pointer;background:rgba(255,255,255,.03);color:var(--ink);border-radius:4px;transition:all .15s;font-weight:500}
-.sa-opt:hover{border-color:rgba(255,255,255,.28);background:rgba(255,255,255,.07)}
+.sa-opt{border:1px solid rgba(255,255,255,.12);padding:15px 20px;text-align:left;width:100%;font-family:inherit;font-size:15px;cursor:pointer;background:rgba(255,255,255,.05);color:#fff;border-radius:3px;transition:all .15s;font-weight:500}
+.sa-opt:hover{border-color:rgba(255,255,255,.3);background:rgba(255,255,255,.1)}
 .sa-opt.sel{border-color:var(--gold);background:var(--gold-l);color:var(--gold);font-weight:700}
-.sa-num{border:1px solid rgba(255,255,255,.12);padding:14px 16px;font-size:22px;font-family:var(--mono);background:rgba(255,255,255,.04);color:var(--ink);outline:none;border-radius:4px;width:100%;font-weight:600;transition:all .15s}
+.sa-num{border:1px solid rgba(255,255,255,.15);padding:14px 16px;font-size:22px;font-family:inherit;background:rgba(255,255,255,.07);color:#fff;outline:none;border-radius:3px;width:100%;font-weight:600;transition:all .15s}
 .sa-num:focus{border-color:var(--gold)}
 .sa-nav{display:flex;justify-content:space-between;align-items:center;margin-top:28px;padding-top:24px;border-top:1px solid var(--border)}
-.sum-box{display:flex;justify-content:space-between;align-items:center;padding:18px 20px;background:var(--gold-l);border:1px solid var(--gold-b);border-radius:4px;margin-top:14px}
-.sum-val{font-family:var(--mono);font-weight:700;color:var(--gold);font-size:20px;letter-spacing:-.01em}
-.sum-box span:first-child{font-family:var(--mono);color:var(--muted);font-size:10px;font-weight:600;letter-spacing:.15em;text-transform:uppercase}
+.sum-box{display:flex;justify-content:space-between;align-items:center;padding:18px 20px;background:var(--gold-l);border:1px solid var(--gold-b);border-radius:3px;margin-top:14px}
+.sum-val{font-weight:900;color:var(--gold);font-size:20px;letter-spacing:-.02em}
+.sum-box span:first-child{color:var(--muted);font-size:10px;font-weight:600;letter-spacing:.15em;text-transform:uppercase}
 
-/* ── Upload-Slots: "Aktenfächer" ─────────────────────────────── */
-.upl-item{
-  position:relative;
-  border:1px solid var(--border);
-  background:var(--surface);
-  margin-bottom:14px;border-radius:8px;overflow:hidden;
-  transition:background .35s ease, border-color .35s ease, box-shadow .35s ease, transform .15s ease;
-  border-left:4px solid rgba(255,255,255,.10);
-}
-.upl-item:hover{border-color:rgba(255,255,255,.18)}
-.upl-item.req-open{border-left-color:var(--gold);box-shadow:0 0 0 1px var(--gold-b), 0 0 24px -8px var(--gold-b)}
-.upl-item.req-open .upl-num{animation:pulse-gold 2.4s ease-in-out infinite}
-.upl-item.done{
-  border-left-color:var(--ok);
-  border-color:var(--ok-b);
-  background:linear-gradient(180deg, rgba(63,182,139,.09), rgba(63,182,139,.03));
-  box-shadow:0 0 0 1px var(--ok-b), 0 8px 28px -16px var(--ok);
-}
-@keyframes pulse-gold{0%,100%{box-shadow:0 0 0 0 var(--gold-b)}50%{box-shadow:0 0 0 6px transparent}}
-
-.upl-hdr{display:flex;align-items:flex-start;justify-content:space-between;padding:18px 20px;gap:14px}
-.upl-item.done .upl-hdr{border-bottom:none}
-.upl-item:not(.done) .upl-hdr{border-bottom:1px solid var(--border)}
-
-.upl-num{
-  display:flex;align-items:center;justify-content:center;
-  width:36px;height:36px;border-radius:6px;flex-shrink:0;
-  font-family:var(--mono);font-size:13px;font-weight:700;
-  background:rgba(255,255,255,.05);color:var(--muted);
-  border:1px solid var(--border);
-  transition:all .35s ease;
-}
-.upl-item.req-open .upl-num{background:var(--gold-l);color:var(--gold);border-color:var(--gold-b)}
-.upl-item.done .upl-num{background:var(--ok);color:#0B1A14;border-color:var(--ok)}
-
-.upl-lbl{font-size:16px;font-weight:700;letter-spacing:-.01em;color:var(--ink);font-family:var(--serif)}
+.upl-item{border:1px solid rgba(255,255,255,.12);background:var(--surface);margin-bottom:12px;border-radius:4px;overflow:hidden;transition:all .2s}
+.upl-item:hover{border-color:rgba(255,255,255,.25)}
+.upl-hdr{display:flex;align-items:flex-start;justify-content:space-between;padding:20px 22px;gap:14px;border-bottom:1px solid rgba(255,255,255,.06)}
+.upl-dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.15);flex-shrink:0;margin-top:6px}
+.upl-num{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:3px;background:var(--gold);color:#000;font-size:14px;font-weight:900;flex-shrink:0}
+.upl-lbl{font-size:16px;font-weight:700;letter-spacing:-.01em;color:#fff}
 .upl-sub{font-size:12px;color:var(--muted);margin-top:4px}
-.upl-hint{font-size:11px;color:var(--gold);margin-top:8px;line-height:1.5;font-weight:600;background:var(--gold-l);padding:8px 12px;border-radius:4px;border-left:3px solid var(--gold)}
-.file-list{padding:0 20px 14px 20px}
-.file-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);gap:8px;font-size:12px;color:var(--muted)}
-.file-row:last-child{border-bottom:none}
+.upl-hint{font-size:11px;color:var(--gold);margin-top:8px;line-height:1.5;font-weight:600;background:var(--gold-l);padding:8px 12px;border-radius:3px;border-left:3px solid var(--gold)}
+.file-list{padding:0 22px 14px 22px}
+.file-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06);gap:8px;font-size:12px;color:var(--muted)}
 .file-in{display:none}
 
-.upl-zone{
-  margin:0 20px 16px;padding:18px;border-radius:6px;
-  border:1.5px dashed rgba(255,255,255,.16);
-  background:rgba(255,255,255,.02);
-  display:flex;align-items:center;justify-content:center;
-  transition:all .2s;
-}
-.upl-item:hover .upl-zone{border-color:rgba(255,255,255,.3);background:rgba(255,255,255,.04)}
-.upl-item.done .upl-zone{display:none}
-
-.upl-stamp{
-  font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.15em;
-  color:var(--ok);background:var(--ok-bg);border:1px solid var(--ok-b);
-  padding:4px 10px;border-radius:4px;text-transform:uppercase;
-  display:inline-flex;align-items:center;gap:6px;flex-shrink:0;
-}
-
-.badge{display:inline-block;padding:3px 10px;font-family:var(--mono);font-size:10px;border-radius:3px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
-.badge-ok{background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok-b)}
+.badge{display:inline-block;padding:3px 10px;font-size:10px;border-radius:2px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.badge-ok{background:var(--ok-bg);color:var(--ok);border:1px solid rgba(70,211,105,.25)}
 
 .login-w{max-width:460px;margin:100px auto}
 
 .row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
 .new-m{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:28px;align-items:flex-end}
 
-.consent-box{border:1px solid var(--border);border-radius:6px;padding:18px;background:rgba(255,255,255,.02);display:flex;gap:14px;align-items:flex-start}
+.consent-box{border:1px solid var(--border);border-radius:4px;padding:18px;background:rgba(255,255,255,.03);display:flex;gap:14px;align-items:flex-start}
 .consent-text{font-size:12px;color:var(--muted);line-height:1.8}
 
 .divider{height:1px;background:var(--border);margin:24px 0}
 
-.toast{position:fixed;bottom:28px;right:28px;background:var(--ink);color:#0B0E14;padding:14px 22px;border-radius:4px;font-size:13px;font-weight:700;z-index:999;animation:slideUp .2s ease}
+.toast{position:fixed;bottom:28px;right:28px;background:#fff;color:#000;padding:14px 22px;border-radius:3px;font-size:13px;font-weight:700;z-index:999;animation:slideUp .2s ease}
 @keyframes slideUp{from{transform:translateY(8px);opacity:0}to{transform:translateY(0);opacity:1}}
 
 .done-wrap{text-align:center;padding:80px 20px}
 .done-icon{font-size:48px;margin-bottom:24px}
-.done-title{font-family:var(--serif);font-size:38px;font-weight:600;letter-spacing:-.02em;margin-bottom:10px}
+.done-title{font-size:36px;font-weight:900;letter-spacing:-.03em;margin-bottom:10px}
 .done-sub{font-size:16px;color:var(--muted)}
 
-.sign-wrap{border:1px solid var(--border);border-radius:6px;overflow:hidden}
-.sign-foot{display:flex;justify-content:space-between;padding:10px 14px;border-top:1px solid var(--border);font-family:var(--mono);font-size:10px;color:var(--muted);align-items:center;letter-spacing:.1em;text-transform:uppercase}
+.sign-wrap{border:1px solid var(--border);border-radius:4px;overflow:hidden}
+.sign-foot{display:flex;justify-content:space-between;padding:10px 14px;border-top:1px solid var(--border);font-size:10px;color:var(--muted);align-items:center;letter-spacing:.1em;text-transform:uppercase}
 
-.tab-bar{display:flex;gap:2px;margin-bottom:32px;background:rgba(255,255,255,.04);padding:4px;border-radius:6px;width:fit-content;border:1px solid var(--border)}
-.tab-btn{padding:8px 20px;background:transparent;border:none;border-radius:4px;font-family:var(--mono);font-size:10px;font-weight:700;cursor:pointer;color:var(--muted);letter-spacing:.15em;text-transform:uppercase;transition:all .15s}
-.tab-btn.active{background:var(--gold);color:#1a1306}
-.tab-btn:hover:not(.active){color:var(--ink)}
+.tab-bar{display:flex;gap:2px;margin-bottom:32px;background:rgba(255,255,255,.05);padding:4px;border-radius:4px;width:fit-content}
+.tab-btn{padding:8px 20px;background:transparent;border:none;border-radius:3px;font-family:inherit;font-size:10px;font-weight:700;cursor:pointer;color:var(--muted);letter-spacing:.15em;text-transform:uppercase;transition:all .15s}
+.tab-btn.active{background:var(--gold);color:#000}
+.tab-btn:hover:not(.active){color:#fff}
 
 @media(max-width:600px){
   *{word-break:break-word;overflow-wrap:break-word}
@@ -768,7 +722,7 @@ function SAWizard({crmData, adminData, existing, onSave, onClose}) {
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(15,14,12,0.85)",overflowY:"auto",zIndex:100,padding:"20px"}}>
-      <div style={{background:"var(--surface)",maxWidth:560,margin:"0 auto",border:"1px solid var(--gold-b)",borderRadius:8,padding:"28px 24px",boxShadow:"0 0 0 1px var(--gold-b), 0 0 40px -12px var(--gold-b)"}}>
+      <div style={{background:"var(--paper)",maxWidth:560,margin:"0 auto",border:"1px solid var(--ink)",padding:"28px 24px"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
           <div style={{fontSize:11,color:"var(--muted)"}}>Schritt {step+1} von {total}</div>
           <button onClick={onClose} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:"var(--muted)"}}>×</button>
@@ -1072,63 +1026,53 @@ function MandantPage({mandantId}) {
       </div>
 
       <span className="lbl">Unterlagen hochladen</span>
-      {DOCS.map((dok,idx)=>{
+      {DOCS.map(dok=>{
         const files=uploads[dok.id]??[];
         const noDoc=!!uploads[`${dok.id}_nodoc`];
         const already=!!uploads[`${dok.id}_already`];
         const ok=files.length>0||noDoc||already;
-        const itemClass="upl-item"+(ok?" done":(dok.required?" req-open":""));
+        const bgColor = ok ? "var(--ok-bg)" : "var(--paper)";
+        const borderColor = ok ? "var(--ok)" : "var(--line)";
         return(
-          <div key={dok.id} className={itemClass}>
+          <div key={dok.id} className="upl-item" style={{borderColor:ok?"var(--gold)":undefined,background:ok?"var(--gold-l)":undefined}}>
             <div className="upl-hdr">
-              <div style={{display:"flex",alignItems:"flex-start",gap:14}}>
-                <div className="upl-num">{ok?"✓":String(idx+1).padStart(2,"0")}</div>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <div className="upl-dot" style={{background:ok?"var(--ok)":"var(--line)"}}/>
                 <div>
-                  <div className="upl-lbl">{dok.label}{dok.required&&!ok&&<span style={{color:"var(--gold)",marginLeft:4}}>*</span>}</div>
+                  <div className="upl-lbl">{dok.label}{dok.required&&<span style={{color:"var(--accent)",marginLeft:4}}>*</span>}</div>
                   <div className="upl-sub">{dok.sublabel}</div>
                   {dok.hint&&!ok&&<div className="upl-hint">ℹ {dok.hint}</div>}
                 </div>
               </div>
               <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-                {ok&&<span className="upl-stamp">✓ Eingereicht</span>}
-                {!noDoc&&!already&&ok&&(
+                {ok&&<span className="badge badge-ok">✓</span>}
+                {!noDoc&&!already&&(
                   <label className="btn btn-o btn-sm" style={{cursor:"pointer"}}>
-                    + Weitere
+                    {files.length>0?"+ Weitere hochladen":dok.camera?"📷 Foto/Upload":"Hochladen"}
                     <input type="file" className="file-in" multiple accept="image/*,application/pdf" capture={dok.camera?"environment":undefined} onChange={e=>handleUpload(dok.id,e.target.files)}/>
                   </label>
                 )}
               </div>
             </div>
-
-            {!ok&&!noDoc&&(
-              <label className="upl-zone" style={{cursor:"pointer"}}>
-                <span style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,color:"var(--muted)",fontSize:12,fontWeight:600,letterSpacing:".05em"}}>
-                  <span style={{fontSize:22}}>{dok.camera?"📷":"📎"}</span>
-                  <span>{dok.camera?"Foto aufnehmen oder Datei hochladen":"Datei hier hochladen"}</span>
-                </span>
-                <input type="file" className="file-in" multiple accept="image/*,application/pdf" capture={dok.camera?"environment":undefined} onChange={e=>handleUpload(dok.id,e.target.files)}/>
-              </label>
-            )}
-
             {dok.noDoc&&!noDoc&&files.length===0&&!uploads[`${dok.id}_already`]&&(
-              <div style={{padding:"0 20px 16px"}}>
+              <div style={{padding:"0 14px 12px 32px"}}>
                 <button className="btn btn-o btn-sm" onClick={()=>handleNoDoc(dok.id)}>☐ {dok.noDocLabel}</button>
               </div>
             )}
             {noDoc&&(
-              <div style={{padding:"0 20px 16px",display:"flex",alignItems:"center",gap:8}}>
-                <span className="upl-stamp">☑ {dok.noDocLabel}</span>
+              <div style={{padding:"0 14px 12px 32px",display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:11,color:"var(--ok)"}}>☑ {dok.noDocLabel}</span>
                 <button className="btn btn-del btn-sm" onClick={()=>handleUndoNoDoc(dok.id)}>Rückgängig</button>
               </div>
             )}
             {dok.canHaveAlready&&!already&&files.length===0&&!noDoc&&(
-              <div style={{padding:"0 20px 16px"}}>
-                <button className="btn btn-o btn-sm" style={{color:"var(--ok)",borderColor:"var(--ok-b)"}} onClick={()=>handleAlreadyHave(dok.id)}>☐ Bereits vorhanden – liegt bei uns vor</button>
+              <div style={{padding:"0 14px 12px 32px"}}>
+                <button className="btn btn-o btn-sm" style={{color:"var(--ok)",borderColor:"var(--ok)"}} onClick={()=>handleAlreadyHave(dok.id)}>☐ Bereits vorhanden – liegt bei uns vor</button>
               </div>
             )}
             {already&&(
-              <div style={{padding:"0 20px 16px",display:"flex",alignItems:"center",gap:8}}>
-                <span className="upl-stamp">✓ Bereits vorhanden</span>
+              <div style={{padding:"0 14px 12px 32px",display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:12,color:"var(--ok)",fontWeight:500}}>✓ Bereits vorhanden – liegt bei uns vor</span>
                 <button className="btn btn-del btn-sm" onClick={()=>handleUndoAlready(dok.id)}>Rückgängig</button>
               </div>
             )}
@@ -1138,7 +1082,7 @@ function MandantPage({mandantId}) {
                   <div key={i} className="file-row">
                     <span style={{display:"flex",alignItems:"center",gap:6}}>
                       <span>📄</span>
-                      <span style={{fontFamily:"var(--mono)",fontSize:11}}>{f.name}</span>
+                      <span style={{fontSize:11}}>{f.name}</span>
                     </span>
                     <button className="btn btn-del btn-sm" onClick={()=>handleRemove(dok.id,i)}>×</button>
                   </div>
@@ -1151,16 +1095,14 @@ function MandantPage({mandantId}) {
 
       <div className="divider"/>
 
-      <div className="card" style={selbstauskunft
-        ?{borderColor:"var(--ok-b)",background:"var(--ok-bg)"}
-        :{borderColor:"var(--gold-b)",background:"var(--gold-l)",boxShadow:"0 0 0 1px var(--gold-b), 0 0 24px -10px var(--gold-b)"}}>
-        <div style={{fontFamily:"var(--serif)",fontSize:22,marginBottom:4,fontWeight:600}}>Selbstauskunft</div>
+      <div className="card" style={{borderColor:selbstauskunft?"var(--ok)":"var(--line)",background:selbstauskunft?"var(--ok-bg)":"var(--cream)"}}>
+        <div style={{fontFamily:"'Inter',sans-serif",fontSize:20,marginBottom:4}}>Selbstauskunft</div>
         <div style={{color:"var(--muted)",fontSize:11,marginBottom:14}}>
           {selbstauskunft?"Ausgefüllt und gespeichert.":"Bitte alle Angaben zu Beruf, Einkommen und Vermögen machen."}
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
           {selbstauskunft&&<span className="badge badge-ok">✓ Ausgefüllt</span>}
-          <button className={selbstauskunft?"btn btn-o btn-sm":"btn btn-ok btn-sm"} onClick={()=>setShowSA(true)}>{selbstauskunft?"Bearbeiten":"Jetzt ausfüllen →"}</button>
+          <button className="btn btn-o btn-sm" onClick={()=>setShowSA(true)}>{selbstauskunft?"Bearbeiten":"Ausfüllen →"}</button>
           {selbstauskunft&&<button className="btn btn-o btn-sm" onClick={handleDownloadSA}>📄 PDF herunterladen</button>}
         </div>
       </div>
@@ -1264,23 +1206,47 @@ function MandantPage({mandantId}) {
 
 // ── Admin Login ──────────────────────────────────────────────────
 function AdminLogin({onLogin}){
-  const [pw,setPw]=useState("");const [err,setErr]=useState(false);
-  function check(){if(pw===ADMIN_PASSWORD){sessionStorage.setItem("ks2admin","1");onLogin();}else{setErr(true);setTimeout(()=>setErr(false),2000);}}
+  const [email,setEmail]=useState("");
+  const [pw,setPw]=useState("");
+  const [err,setErr]=useState(false);
+  const [loading,setLoading]=useState(false);
+
+  async function check(){
+    if(!email||!pw){setErr(true);setTimeout(()=>setErr(false),2000);return;}
+    setLoading(true);
+    const token = await supaLogin(email.trim(), pw);
+    setLoading(false);
+    if(token){
+      setAccessToken(token);
+      sessionStorage.setItem("ks2_token", token);
+      onLogin();
+    }else{
+      setErr(true);setTimeout(()=>setErr(false),2000);
+    }
+  }
+
   return(
     <div className="app"><style>{CSS}</style>
       <div className="login-w">
         <div className="hdr-sub">KS2 · Immobilien</div>
-        <div style={{fontFamily:"'Inter',sans-serif",fontSize:28,marginBottom:24}}>Admin<br/><em style={{fontStyle:"italic",color:"var(--accent)"}}>Zugang</em></div>
-        <input className="ifield" type="password" placeholder="Passwort" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>e.key==="Enter"&&check()} style={{width:"100%",marginBottom:8,borderColor:err?"var(--accent)":undefined}}/>
-        {err&&<div style={{color:"var(--accent)",fontSize:11,marginBottom:8}}>Falsches Passwort</div>}
-        <button className="btn" style={{width:"100%"}} onClick={check}>Einloggen →</button>
+        <div className="hdr-title" style={{marginBottom:24}}>Admin<br/><em>Zugang</em></div>
+        <div className="fg" style={{marginBottom:10}}>
+          <span className="lbl">E-Mail</span>
+          <input className="ifield" type="email" autoComplete="username" placeholder="email@tecis.de" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&check()}/>
+        </div>
+        <div className="fg" style={{marginBottom:10}}>
+          <span className="lbl">Passwort</span>
+          <input className="ifield" type="password" autoComplete="current-password" placeholder="Passwort" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>e.key==="Enter"&&check()} style={{borderColor:err?"var(--red)":undefined}}/>
+        </div>
+        {err&&<div style={{color:"var(--red)",fontSize:11,marginBottom:8}}>Login fehlgeschlagen – E-Mail oder Passwort falsch.</div>}
+        <button className="btn" style={{width:"100%"}} onClick={check} disabled={loading}>{loading?"Prüfe…":"Einloggen →"}</button>
       </div>
     </div>
   );
 }
 
 // ── Admin Page ───────────────────────────────────────────────────
-function AdminPage(){
+function AdminPage({onLogout}){
   const [mandanten,setMandanten]=useState({});
   const [name,setName]=useState("");
   const [copiedId,setCopiedId]=useState(null);
@@ -1429,9 +1395,12 @@ function AdminPage(){
 
   return(
     <div className="app"><style>{CSS}</style>
-      <div className="hdr">
-        <div className="hdr-sub">KS2 · Immobilien Einwertung</div>
-        <div className="hdr-title">Mandanten<br/><em>verwalten</em></div>
+      <div className="hdr" style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end"}}>
+        <div>
+          <div className="hdr-sub">KS2 · Immobilien Einwertung</div>
+          <div className="hdr-title">Mandanten<br/><em>verwalten</em></div>
+        </div>
+        <button className="btn-o btn-sm" onClick={onLogout} style={{padding:"6px 14px",fontSize:10}}>Abmelden</button>
       </div>
 
       {/* Tabs */}
@@ -1498,16 +1467,17 @@ function AdminPage(){
                   borderColor: d?.eingereicht ? "var(--ok)" : "var(--line)",
                   background: d?.eingereicht ? "var(--ok-bg)" : "var(--paper)"
                 }}>
-                  <div className="m-row" style={{paddingTop:18}}>
+                  <div className="m-row">
                     <div style={{flex:1}}>
                       <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                        <strong style={{fontSize:18,fontFamily:"var(--serif)",fontWeight:600}}>{m.vorname} {m.nachname}</strong>
+                        <strong>{m.vorname} {m.nachname}</strong>
                         {d?.crmData&&<span className="badge badge-ok">CRM</span>}
                         {d?.adminData?.iban&&<span className="badge badge-ok">IBAN</span>}
                         {d?.selbstauskunft&&<span className="badge badge-ok">SA ✓</span>}
                         {d?.eingereicht&&<span className="badge badge-ok" style={{background:"var(--ok)",color:"white"}}>✓ Eingereicht</span>}
                       </div>
                       <div style={{fontSize:11,color:"var(--muted)",marginTop:2}}>{getProgress(id)} Schritte</div>
+                      <div className="link-s">{genLink(id)}</div>
                       {m.pin&&<div style={{fontSize:12,marginTop:4,color:"var(--ok)",fontWeight:500}}>🔑 PIN: <strong>{m.pin}</strong></div>}
                       {(()=>{
                         // Use berater_name directly from data - most reliable
@@ -1593,8 +1563,12 @@ function AdminPage(){
 
 export default function App(){
   const mandantId=getMandantId();
-  const [adminAuth,setAdminAuth]=useState(()=>sessionStorage.getItem("ks2admin")==="1");
+  const [adminAuth,setAdminAuth]=useState(()=>{
+    const t = sessionStorage.getItem("ks2_token");
+    if(t){ setAccessToken(t); return true; }
+    return false;
+  });
   if(mandantId)return<MandantPage mandantId={mandantId}/>;
   if(!adminAuth)return<AdminLogin onLogin={()=>setAdminAuth(true)}/>;
-  return<AdminPage/>;
+  return<AdminPage onLogout={()=>{setAccessToken(null);sessionStorage.removeItem("ks2_token");setAdminAuth(false);}}/>;
 }
