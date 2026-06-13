@@ -435,42 +435,39 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
 :root{
-  --bg: #0B0E14;
-  --surface: #141A24;
-  --card: #1B2330;
-  --border: rgba(255,255,255,.08);
-  --ink: #F5F1E8;
-  --muted: rgba(245,241,232,.48);
-  --gold: #E0A82E;
-  --gold-l: rgba(224,168,46,.10);
-  --gold-b: rgba(224,168,46,.35);
-  --ok: #3FB68B;
-  --ok-bg: rgba(63,182,139,.10);
-  --ok-b: rgba(63,182,139,.4);
-  --red: #D9534F;
-  --serif: 'Fraunces', Georgia, serif;
-  --sans: 'Inter', sans-serif;
-  --mono: 'JetBrains Mono', monospace;
+  --bg:#0B0E14;
+  --surface:#141A24;
+  --card:#1B2330;
+  --border:rgba(255,255,255,.08);
+  --ink:#F5F1E8;
+  --muted:rgba(245,241,232,.48);
+  --gold:#E0A82E;
+  --gold-l:rgba(224,168,46,.10);
+  --gold-b:rgba(224,168,46,.35);
+  --steel:#E0A82E;
+  --steel-l:rgba(224,168,46,.14);
+  --ok:#3FB68B;
+  --ok-bg:rgba(63,182,139,.10);
+  --ok-b:rgba(63,182,139,.4);
+  --red:#D9534F;
+  --red-bg:rgba(217,83,79,.1);
+  --serif:'Fraunces',Georgia,serif;
+  --sans:'Inter',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+  --paper:var(--surface);
+  --line:var(--border);
+  --accent:var(--red);
+  --cream:rgba(255,255,255,.02);
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
-body{
-  background:var(--bg);
-  color:var(--ink);
-  font-family:var(--sans);
-  font-size:14px;
-  line-height:1.6;
-  min-height:100vh;
-  background-image:
-    radial-gradient(circle at 0% 0%, rgba(224,168,46,.06), transparent 45%),
-    radial-gradient(circle at 100% 100%, rgba(224,168,46,.06), transparent 50%);
-}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;min-height:100vh;background-image:radial-gradient(circle at 15% 0%, rgba(224,168,46,.06), transparent 45%),radial-gradient(circle at 85% 100%, rgba(224,168,46,.06), transparent 50%)}
 
 .app{max-width:760px;margin:0 auto;padding:48px 28px 100px}
 
-.hdr{margin-bottom:52px;padding-bottom:24px;border-bottom:1px solid var(--border)}
-.hdr-sub{font-family:var(--mono);font-size:10px;letter-spacing:.25em;text-transform:uppercase;color:var(--gold);margin-bottom:12px;font-weight:700}
-.hdr-title{font-family:var(--serif);font-size:42px;font-weight:600;line-height:1.05;letter-spacing:-.01em;color:var(--ink)}
-.hdr-title em{font-style:italic;color:var(--gold)}
+.hdr{margin-bottom:52px;border-bottom:1px solid var(--border);padding-bottom:24px}
+.hdr-sub{font-family:var(--mono);font-size:10px;letter-spacing:.25em;text-transform:uppercase;color:var(--steel);margin-bottom:14px;font-weight:600}
+.hdr-title{font-family:var(--serif);font-size:46px;font-weight:600;line-height:1.05;letter-spacing:-.02em;color:#fff}
+.hdr-title em{font-style:italic;color:var(--gold);font-weight:500}
 
 .card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:24px;margin-bottom:12px;transition:all .3s ease}
 
@@ -483,19 +480,19 @@ body{
 .m-dot.exp{background:var(--gold)}
 .m-detail{padding:20px 22px;border-top:1px solid var(--border);background:var(--card)}
 
-.btn{display:inline-flex;align-items:center;gap:6px;padding:10px 22px;border:1px solid var(--ink);background:var(--ink);color:var(--bg);font-size:12px;font-family:var(--sans);cursor:pointer;letter-spacing:.02em;border-radius:4px;font-weight:700;transition:all .15s;text-decoration:none;white-space:nowrap}
-.btn:hover{background:#fff;border-color:#fff}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:11px 24px;border:none;background:var(--ink);color:#0B0E14;font-size:13px;font-family:var(--sans);cursor:pointer;letter-spacing:.02em;border-radius:4px;font-weight:700;transition:all .15s;text-decoration:none;white-space:nowrap}
+.btn:hover{background:#fff}
 .btn:active{transform:scale(.98)}
-.btn-o{background:rgba(255,255,255,.06);color:var(--ink);border:1px solid rgba(255,255,255,.15)}
-.btn-o:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.3)}
-.btn-ok{background:var(--gold);border-color:var(--gold);color:#1a1206;font-weight:800}
-.btn-ok:hover{background:#f0b73c;border-color:#f0b73c}
-.btn-del{background:rgba(217,83,79,.08);color:var(--red);border:1px solid rgba(217,83,79,.3)}
-.btn-del:hover{background:rgba(217,83,79,.15)}
+.btn-o{background:rgba(255,255,255,.06);color:var(--ink);border:1px solid rgba(255,255,255,.18)}
+.btn-o:hover{background:rgba(255,255,255,.12)}
+.btn-ok{background:var(--gold);color:#1a1306;font-weight:800}
+.btn-ok:hover{background:#dfb52e}
+.btn-del{background:var(--red-bg);color:var(--red);border:1px solid rgba(217,83,79,.3)}
+.btn-del:hover{background:rgba(217,83,79,.2)}
 .btn-sm{padding:6px 14px;font-size:10px}
 .btn:disabled{opacity:.3;cursor:not-allowed;transform:none}
 
-.ifield{border:1px solid var(--border);padding:11px 14px;font-size:14px;font-family:var(--sans);background:rgba(255,255,255,.03);color:var(--ink);outline:none;border-radius:6px;transition:all .15s;width:100%}
+.ifield{border:1px solid var(--border);padding:11px 14px;font-size:14px;font-family:var(--sans);background:rgba(255,255,255,.03);color:var(--ink);outline:none;border-radius:4px;transition:all .15s;width:100%}
 .ifield:focus{border-color:var(--gold);background:var(--gold-l)}
 .ifield::placeholder{color:var(--muted)}
 select.ifield option{background:var(--surface);color:var(--ink)}
@@ -506,37 +503,51 @@ select.ifield option{background:var(--surface);color:var(--ink)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .fg{display:flex;flex-direction:column;gap:4px;margin-bottom:4px}
 
-.pg-bar{height:1px;background:var(--border);margin-bottom:32px;overflow:hidden}
-.pg-fill{height:100%;background:var(--gold);transition:width .4s ease}
+.pg-bar{height:2px;background:rgba(255,255,255,.08);margin-bottom:32px;overflow:hidden;border-radius:1px}
+.pg-fill{height:100%;background:linear-gradient(90deg,var(--steel),var(--gold));transition:width .4s ease}
 .pg-hdr{font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:8px;display:flex;justify-content:space-between;font-weight:600;letter-spacing:.15em;text-transform:uppercase}
 
-.sa-q{font-family:var(--serif);font-size:30px;font-weight:600;line-height:1.2;letter-spacing:-.01em;margin-bottom:8px}
-.sa-hint{font-size:13px;color:var(--muted);margin-bottom:28px;line-height:1.7}
+.sa-q{font-family:var(--serif);font-size:32px;font-weight:600;line-height:1.2;letter-spacing:-.01em;margin-bottom:8px}
+.sa-hint{font-size:14px;color:var(--muted);margin-bottom:28px;line-height:1.7}
 .sa-opts{display:flex;flex-direction:column;gap:8px;margin-bottom:20px}
-.sa-opt{border:1px solid var(--border);padding:14px 18px;text-align:left;width:100%;font-family:var(--sans);font-size:14px;cursor:pointer;background:rgba(255,255,255,.03);color:var(--ink);border-radius:6px;transition:all .15s;font-weight:400}
-.sa-opt:hover{border-color:rgba(255,255,255,.25);background:rgba(255,255,255,.06)}
-.sa-opt.sel{border-color:var(--gold-b);background:var(--gold-l);color:var(--gold);font-weight:600}
-.sa-num{border:1px solid var(--border);padding:14px 16px;font-size:20px;font-family:var(--mono);background:rgba(255,255,255,.03);color:var(--ink);outline:none;border-radius:6px;width:100%;font-weight:500;transition:all .15s}
-.sa-num:focus{border-color:var(--gold);background:var(--gold-l)}
+.sa-opt{border:1px solid rgba(255,255,255,.1);padding:15px 20px;text-align:left;width:100%;font-family:var(--sans);font-size:15px;cursor:pointer;background:rgba(255,255,255,.03);color:var(--ink);border-radius:4px;transition:all .15s;font-weight:500}
+.sa-opt:hover{border-color:rgba(255,255,255,.28);background:rgba(255,255,255,.07)}
+.sa-opt.sel{border-color:var(--gold);background:var(--gold-l);color:var(--gold);font-weight:700}
+.sa-num{border:1px solid rgba(255,255,255,.12);padding:14px 16px;font-size:22px;font-family:var(--mono);background:rgba(255,255,255,.04);color:var(--ink);outline:none;border-radius:4px;width:100%;font-weight:600;transition:all .15s}
+.sa-num:focus{border-color:var(--gold)}
 .sa-nav{display:flex;justify-content:space-between;align-items:center;margin-top:28px;padding-top:24px;border-top:1px solid var(--border)}
-.sum-box{display:flex;justify-content:space-between;align-items:center;padding:16px 18px;background:var(--gold-l);border:1px solid var(--gold-b);border-radius:6px;margin-top:14px}
-.sum-val{font-family:var(--mono);font-weight:700;color:var(--gold);font-size:18px;letter-spacing:-.01em}
+.sum-box{display:flex;justify-content:space-between;align-items:center;padding:18px 20px;background:var(--gold-l);border:1px solid var(--gold-b);border-radius:4px;margin-top:14px}
+.sum-val{font-family:var(--mono);font-weight:700;color:var(--gold);font-size:20px;letter-spacing:-.01em}
 .sum-box span:first-child{font-family:var(--mono);color:var(--muted);font-size:10px;font-weight:600;letter-spacing:.15em;text-transform:uppercase}
 
-.upl-item{border:1px solid var(--border);background:var(--surface);margin-bottom:12px;border-radius:8px;overflow:hidden;transition:all .35s ease}
+.upl-item{position:relative;border:1px solid var(--border);background:var(--surface);margin-bottom:14px;border-radius:8px;overflow:hidden;transition:background .35s ease, border-color .35s ease, box-shadow .35s ease, transform .15s ease;border-left:4px solid rgba(255,255,255,.10)}
 .upl-item:hover{border-color:rgba(255,255,255,.18)}
-.upl-item.attn{border-color:var(--gold-b);background:linear-gradient(180deg,var(--gold-l),rgba(224,168,46,.02));box-shadow:0 0 0 1px var(--gold-b)}
-.upl-item.ok{border-color:var(--ok-b);background:linear-gradient(180deg,var(--ok-bg),rgba(63,182,139,.03));box-shadow:0 0 0 1px var(--ok-b),0 8px 28px -16px var(--ok)}
+.upl-item.req-open{border-left-color:var(--gold);box-shadow:0 0 0 1px var(--gold-b), 0 0 24px -8px var(--gold-b)}
+.upl-item.req-open .upl-num{animation:pulse-gold 2.4s ease-in-out infinite}
+.upl-item.done{border-left-color:var(--ok);border-color:var(--ok-b);background:linear-gradient(180deg, rgba(63,182,139,.09), rgba(63,182,139,.03));box-shadow:0 0 0 1px var(--ok-b), 0 8px 28px -16px var(--ok)}
+@keyframes pulse-gold{0%,100%{box-shadow:0 0 0 0 var(--gold-b)}50%{box-shadow:0 0 0 6px transparent}}
+
 .upl-hdr{display:flex;align-items:flex-start;justify-content:space-between;padding:18px 20px;gap:14px}
-.upl-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.15);flex-shrink:0;margin-top:6px;transition:background .3s}
-.upl-num{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:6px;background:var(--gold-l);border:1px solid var(--gold-b);color:var(--gold);font-family:var(--mono);font-size:12px;font-weight:700;flex-shrink:0}
-.upl-item.ok .upl-num{background:var(--ok-bg);border-color:var(--ok-b);color:var(--ok)}
-.upl-lbl{font-size:15px;font-weight:700;letter-spacing:-.005em;color:var(--ink)}
-.upl-sub{font-size:12px;color:var(--muted);margin-top:3px}
-.upl-hint{font-size:11px;color:var(--gold);margin-top:8px;line-height:1.5;font-weight:500;background:var(--gold-l);padding:8px 12px;border-radius:4px;border-left:3px solid var(--gold)}
+.upl-item.done .upl-hdr{border-bottom:none}
+.upl-item:not(.done) .upl-hdr{border-bottom:1px solid var(--border)}
+
+.upl-num{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:6px;flex-shrink:0;font-family:var(--mono);font-size:13px;font-weight:700;background:rgba(255,255,255,.05);color:var(--muted);border:1px solid var(--border);transition:all .35s ease}
+.upl-item.req-open .upl-num{background:var(--gold-l);color:var(--gold);border-color:var(--gold-b)}
+.upl-item.done .upl-num{background:var(--ok);color:#0B1A14;border-color:var(--ok)}
+
+.upl-lbl{font-size:16px;font-weight:700;letter-spacing:-.01em;color:var(--ink);font-family:var(--serif)}
+.upl-sub{font-size:12px;color:var(--muted);margin-top:4px}
+.upl-hint{font-size:11px;color:var(--gold);margin-top:8px;line-height:1.5;font-weight:600;background:var(--gold-l);padding:8px 12px;border-radius:4px;border-left:3px solid var(--gold)}
 .file-list{padding:0 20px 14px 20px}
-.file-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);gap:8px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.file-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);gap:8px;font-size:12px;color:var(--muted)}
+.file-row:last-child{border-bottom:none}
 .file-in{display:none}
+
+.upl-zone{margin:0 20px 16px;padding:18px;border-radius:6px;border:1.5px dashed rgba(255,255,255,.16);background:rgba(255,255,255,.02);display:flex;align-items:center;justify-content:center;transition:all .2s}
+.upl-item:hover .upl-zone{border-color:rgba(255,255,255,.3);background:rgba(255,255,255,.04)}
+.upl-item.done .upl-zone{display:none}
+
+.upl-stamp{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.15em;color:var(--ok);background:var(--ok-bg);border:1px solid var(--ok-b);padding:4px 10px;border-radius:4px;text-transform:uppercase;display:inline-flex;align-items:center;gap:6px;flex-shrink:0}
 
 .badge{display:inline-block;padding:3px 10px;font-family:var(--mono);font-size:10px;border-radius:4px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
 .badge-ok{background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok-b)}
@@ -580,6 +591,7 @@ select.ifield option{background:var(--surface);color:var(--ink)}
   .tab-btn{flex:1;text-align:center}
 }
 `;
+
 
 
 
@@ -740,8 +752,8 @@ function SAWizard({crmData, adminData, existing, onSave, onClose}) {
   const isLast = step===total-1;
 
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(15,14,12,0.85)",overflowY:"auto",zIndex:100,padding:"20px"}}>
-      <div style={{background:"var(--paper)",maxWidth:560,margin:"0 auto",border:"1px solid var(--ink)",padding:"28px 24px"}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(11,14,20,0.85)",overflowY:"auto",zIndex:100,padding:"20px",backdropFilter:"blur(4px)"}}>
+      <div style={{background:"var(--surface)",maxWidth:560,margin:"40px auto",border:"1px solid var(--gold-b)",borderRadius:8,padding:"28px 24px",boxShadow:"0 0 0 1px var(--gold-b), 0 0 40px -12px var(--gold-b)"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
           <div style={{fontSize:11,color:"var(--muted)"}}>Schritt {step+1} von {total}</div>
           <button onClick={onClose} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:"var(--muted)"}}>×</button>
@@ -1045,56 +1057,60 @@ function MandantPage({mandantId}) {
       </div>
 
       <span className="lbl">Unterlagen hochladen</span>
-      {DOCS.map(dok=>{
+      {DOCS.map((dok,idx)=>{
         const files=uploads[dok.id]??[];
         const noDoc=!!uploads[`${dok.id}_nodoc`];
         const already=!!uploads[`${dok.id}_already`];
         const ok=files.length>0||noDoc||already;
-        const bgColor = ok ? "var(--ok-bg)" : "var(--paper)";
-        const borderColor = ok ? "var(--ok)" : "var(--line)";
+        const reqOpen=!ok&&dok.required;
+        const numLabel=String(idx+1).padStart(2,"0");
         return(
-          <div key={dok.id} className={`upl-item${ok?" ok":dok.required?" attn":""}`}>
+          <div key={dok.id} className={`upl-item${ok?" done":reqOpen?" req-open":""}`}>
             <div className="upl-hdr">
-              <div style={{display:"flex",alignItems:"center",gap:10}}>
-                <div className="upl-dot" style={{background:ok?"var(--ok)":"var(--line)"}}/>
+              <div style={{display:"flex",alignItems:"flex-start",gap:14}}>
+                <div className="upl-num">{ok?"✓":numLabel}</div>
                 <div>
-                  <div className="upl-lbl">{dok.label}{dok.required&&<span style={{color:"var(--accent)",marginLeft:4}}>*</span>}</div>
+                  <div className="upl-lbl">{dok.label}{dok.required&&<span style={{color:"var(--gold)",marginLeft:4}}>*</span>}</div>
                   <div className="upl-sub">{dok.sublabel}</div>
                   {dok.hint&&!ok&&<div className="upl-hint">ℹ {dok.hint}</div>}
                 </div>
               </div>
-              <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-                {ok&&<span className="badge badge-ok">✓</span>}
-                {!noDoc&&!already&&(
-                  <label className="btn btn-o btn-sm" style={{cursor:"pointer"}}>
-                    {files.length>0?"+ Weitere hochladen":dok.camera?"📷 Foto/Upload":"Hochladen"}
-                    <input type="file" className="file-in" multiple accept="image/*,application/pdf" capture={dok.camera?"environment":undefined} onChange={e=>handleUpload(dok.id,e.target.files)}/>
-                  </label>
-                )}
-              </div>
+              {ok&&<span className="upl-stamp">✓ Eingereicht</span>}
             </div>
-            {dok.noDoc&&!noDoc&&files.length===0&&!uploads[`${dok.id}_already`]&&(
-              <div style={{padding:"0 14px 12px 32px"}}>
+
+            {!ok&&(
+              <div className="upl-zone">
+                <label className="btn btn-o btn-sm" style={{cursor:"pointer"}}>
+                  {files.length>0?"+ Weitere hochladen":dok.camera?"📷 Foto aufnehmen oder Datei hochladen":"📎 Datei hochladen"}
+                  <input type="file" className="file-in" multiple accept="image/*,application/pdf" capture={dok.camera?"environment":undefined} onChange={e=>handleUpload(dok.id,e.target.files)}/>
+                </label>
+              </div>
+            )}
+
+            {dok.noDoc&&!noDoc&&files.length===0&&!already&&(
+              <div style={{padding:"0 20px 16px"}}>
                 <button className="btn btn-o btn-sm" onClick={()=>handleNoDoc(dok.id)}>☐ {dok.noDocLabel}</button>
               </div>
             )}
             {noDoc&&(
-              <div style={{padding:"0 14px 12px 32px",display:"flex",alignItems:"center",gap:8}}>
-                <span style={{fontSize:11,color:"var(--ok)"}}>☑ {dok.noDocLabel}</span>
+              <div style={{padding:"0 20px 16px",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                <span className="upl-stamp">✓ {dok.noDocLabel}</span>
                 <button className="btn btn-del btn-sm" onClick={()=>handleUndoNoDoc(dok.id)}>Rückgängig</button>
               </div>
             )}
+
             {dok.canHaveAlready&&!already&&files.length===0&&!noDoc&&(
-              <div style={{padding:"0 14px 12px 32px"}}>
-                <button className="btn btn-o btn-sm" style={{color:"var(--ok)",borderColor:"var(--ok)"}} onClick={()=>handleAlreadyHave(dok.id)}>☐ Bereits vorhanden – liegt bei uns vor</button>
+              <div style={{padding:"0 20px 16px"}}>
+                <button className="btn btn-o btn-sm" style={{color:"var(--ok)",borderColor:"var(--ok-b)"}} onClick={()=>handleAlreadyHave(dok.id)}>☐ Bereits vorhanden – liegt bei uns vor</button>
               </div>
             )}
             {already&&(
-              <div style={{padding:"0 14px 12px 32px",display:"flex",alignItems:"center",gap:8}}>
-                <span style={{fontSize:12,color:"var(--ok)",fontWeight:500}}>✓ Bereits vorhanden – liegt bei uns vor</span>
+              <div style={{padding:"0 20px 16px",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                <span className="upl-stamp">✓ Bereits vorhanden</span>
                 <button className="btn btn-del btn-sm" onClick={()=>handleUndoAlready(dok.id)}>Rückgängig</button>
               </div>
             )}
+
             {files.length>0&&(
               <div className="file-list">
                 {files.map((f,i)=>(
@@ -1111,17 +1127,20 @@ function MandantPage({mandantId}) {
           </div>
         );
       })}
-
       <div className="divider"/>
 
-      <div className="card" style={{borderColor:selbstauskunft?"var(--ok)":"var(--line)",background:selbstauskunft?"var(--ok-bg)":"var(--cream)"}}>
-        <div style={{fontFamily:"'Inter',sans-serif",fontSize:20,marginBottom:4}}>Selbstauskunft</div>
-        <div style={{color:"var(--muted)",fontSize:11,marginBottom:14}}>
+      <div className="card" style={selbstauskunft
+        ?{borderColor:"var(--ok-b)",background:"var(--ok-bg)"}
+        :{borderColor:"var(--gold-b)",background:"var(--gold-l)",boxShadow:"0 0 0 1px var(--gold-b), 0 0 24px -10px var(--gold-b)"}}>
+        <div style={{fontFamily:"var(--serif)",fontSize:22,marginBottom:4,fontWeight:600}}>Selbstauskunft</div>
+        <div style={{color:"var(--muted)",fontSize:12,marginBottom:16}}>
           {selbstauskunft?"Ausgefüllt und gespeichert.":"Bitte alle Angaben zu Beruf, Einkommen und Vermögen machen."}
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-          {selbstauskunft&&<span className="badge badge-ok">✓ Ausgefüllt</span>}
-          <button className="btn btn-o btn-sm" onClick={()=>setShowSA(true)}>{selbstauskunft?"Bearbeiten":"Ausfüllen →"}</button>
+          {selbstauskunft&&<span className="upl-stamp">✓ Eingereicht</span>}
+          <button className={selbstauskunft?"btn btn-o btn-sm":"btn btn-ok btn-sm"} onClick={()=>setShowSA(true)}>
+            {selbstauskunft?"Bearbeiten":"Jetzt ausfüllen →"}
+          </button>
           {selbstauskunft&&<button className="btn btn-o btn-sm" onClick={handleDownloadSA}>📄 PDF herunterladen</button>}
         </div>
       </div>
@@ -1496,7 +1515,6 @@ function AdminPage({onLogout}){
                         {d?.eingereicht&&<span className="badge badge-ok" style={{background:"var(--ok)",color:"white"}}>✓ Eingereicht</span>}
                       </div>
                       <div style={{fontSize:11,color:"var(--muted)",marginTop:2}}>{getProgress(id)} Schritte</div>
-                      <div className="link-s">{genLink(id)}</div>
                       {m.pin&&<div style={{fontSize:12,marginTop:4,color:"var(--ok)",fontWeight:500}}>🔑 PIN: <strong>{m.pin}</strong></div>}
                       {(()=>{
                         // Use berater_name directly from data - most reliable
