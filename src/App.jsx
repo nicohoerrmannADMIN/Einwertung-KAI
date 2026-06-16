@@ -474,7 +474,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14p
 .m-item{background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:12px;overflow:hidden;transition:all .3s ease}
 .m-item:hover{border-color:rgba(255,255,255,.18)}
 .m-hdr{padding:18px 22px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px}
-.m-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:0 22px 18px}
+.m-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 22px 18px}
 .m-acts{display:flex;gap:6px;flex-wrap:wrap}
 .m-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.15);flex-shrink:0;transition:background .3s}
 .m-dot.exp{background:var(--gold)}
@@ -885,7 +885,14 @@ function MandantPage({mandantId}) {
     );
   }
 
-  if(!data)return <div className="app"><style>{CSS}</style><div style={{color:"var(--muted)",paddingTop:48}}>Lade…</div></div>;
+  if(!data)return(
+    <div className="app"><style>{CSS}</style>
+      <div style={{textAlign:"center",paddingTop:80}}>
+        <div style={{fontFamily:"var(--mono)",fontSize:10,color:"var(--muted)",letterSpacing:".2em",textTransform:"uppercase"}}>Daten werden geladen…</div>
+        <div style={{marginTop:16,color:"var(--gold)",fontSize:20}}>◐</div>
+      </div>
+    </div>
+  );
 
   const {vorname,nachname,uploads={},selbstauskunft=null,crmData=null,adminData={}}=data;
   const fullName=`${vorname} ${nachname}`;
@@ -1505,7 +1512,7 @@ function AdminPage({onLogout}){
                   borderColor: d?.eingereicht ? "var(--ok)" : "var(--line)",
                   background: d?.eingereicht ? "var(--ok-bg)" : "var(--paper)"
                 }}>
-                  <div className="m-row">
+                  <div className="m-row" style={{paddingTop:22}}>
                     <div style={{flex:1}}>
                       <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                         <strong>{m.vorname} {m.nachname}</strong>
@@ -1522,7 +1529,7 @@ function AdminPage({onLogout}){
                         const bnr = m.berater_nr || details[id]?.berater_nr;
                         const label = bname || bnr;
                         if(!label) return null;
-                        return <div style={{fontSize:11,marginTop:3,color:"#2563eb",fontWeight:600}}>👤 {label}</div>;
+                        return <div style={{fontSize:11,marginTop:3,color:"#8a8678",fontWeight:600}}>👤 {label}</div>;
                       })()}
 
 
