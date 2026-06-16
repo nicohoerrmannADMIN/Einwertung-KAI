@@ -23,6 +23,14 @@ async function sbFetch(path, method="GET", body=null, prefer="return=representat
   if (!res.ok) { console.error("SB:", res.status, await res.text()); return null; }
   const t = await res.text(); return t ? JSON.parse(t) : null;
 }
+// Public fetch - always uses anon key, no auth token (for mandant-side reads)
+async function sbPublic(path) {
+  const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
+    headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` }
+  });
+  if (!res.ok) { console.error("SB public:", res.status, await res.text()); return null; }
+  const t = await res.text(); return t ? JSON.parse(t) : null;
+}
 async function supaLogin(email, password) {
   const res = await fetch(`${SB_URL}/auth/v1/token?grant_type=password`, {
     method: "POST",
@@ -45,7 +53,8 @@ async function loadMandanten() {
 async function saveMandanten(d) { /* handled via createMandant */ }
 async function loadMandantData(id) {
   try {
-    const rows = await sbFetch(`mandant_data?mandant_id=eq.${id}&select=data`);
+    // Use public (anon) key - mandant page has no auth token
+    const rows = await sbPublic(`mandant_data?mandant_id=eq.${id}&select=data`);
     return (rows && rows.length > 0) ? rows[0].data : null;
   } catch(e) { return null; }
 }
