@@ -24,12 +24,16 @@ async function sbFetch(path, method="GET", body=null, prefer="return=representat
   const t = await res.text(); return t ? JSON.parse(t) : null;
 }
 // Public fetch - always uses anon key, no auth token (for mandant-side reads)
-async function sbPublic(path, retries=3) {
+async function sbPublic(path, retries=4) {
   for (let i = 0; i < retries; i++) {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(()=>controller.abort(), 8000);
       const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
-        headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` }
+        headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
       if (res.ok) {
         const t = await res.text();
         return t ? JSON.parse(t) : null;
@@ -38,7 +42,7 @@ async function sbPublic(path, retries=3) {
     } catch(e) {
       console.warn(`SB public attempt ${i+1} error:`, e.message);
     }
-    if (i < retries - 1) await new Promise(r => setTimeout(r, 800 * (i + 1)));
+    if (i < retries - 1) await new Promise(r => setTimeout(r, 1200 * (i + 1)));
   }
   console.error("SB public: all retries failed for", path);
   return null;
@@ -879,7 +883,26 @@ function MandantPage({mandantId}) {
   // Store actual File objects separately (not persisted)
   const fileCache = useRef({});
 
-  useEffect(()=>{ loadMandantData(mandantId).then(d=>{if(d)setData(d);}); },[mandantId]);
+  const [loadErr,setLoadErr]=useState(false);
+  const [loadAttempt,setLoadAttempt]=useState(0);
+
+  useEffect(()=>{
+    let cancelled = false;
+    setLoadErr(false);
+    loadMandantData(mandantId).then(d=>{
+      if(cancelled) return;
+      if(d){ setData(d); }
+      else { setLoadErr(true); }
+    });
+    return ()=>{ cancelled = true; };
+  },[mandantId, loadAttempt]);
+
+  // Auto-retry once more after 3s if still failed (covers cold-start without user action)
+  useEffect(()=>{
+    if(!loadErr) return;
+    const t = setTimeout(()=>{ setLoadAttempt(a=>a+1); }, 3000);
+    return ()=>clearTimeout(t);
+  },[loadErr]);
 
   const storedPin = data?.pin;
 
@@ -908,8 +931,18 @@ function MandantPage({mandantId}) {
   if(!data)return(
     <div className="app"><style>{CSS}</style>
       <div style={{textAlign:"center",paddingTop:80}}>
-        <div style={{fontFamily:"var(--mono)",fontSize:10,color:"var(--muted)",letterSpacing:".2em",textTransform:"uppercase"}}>Daten werden geladen…</div>
-        <div style={{marginTop:16,color:"var(--gold)",fontSize:20}}>◐</div>
+        {!loadErr ? (
+          <>
+            <div style={{fontFamily:"var(--mono)",fontSize:10,color:"var(--muted)",letterSpacing:".2em",textTransform:"uppercase"}}>Daten werden geladen…</div>
+            <div style={{marginTop:16,color:"var(--gold)",fontSize:20}}>◐</div>
+          </>
+        ) : (
+          <>
+            <div style={{fontFamily:"var(--mono)",fontSize:10,color:"var(--red)",letterSpacing:".2em",textTransform:"uppercase",marginBottom:16}}>Verbindung fehlgeschlagen</div>
+            <div style={{color:"var(--muted)",fontSize:13,marginBottom:20,maxWidth:280,marginLeft:"auto",marginRight:"auto"}}>Die Daten konnten nicht geladen werden. Das passiert manchmal beim ersten Öffnen.</div>
+            <button className="btn btn-ok" onClick={()=>setLoadAttempt(a=>a+1)}>Erneut versuchen</button>
+          </>
+        )}
       </div>
     </div>
   );
