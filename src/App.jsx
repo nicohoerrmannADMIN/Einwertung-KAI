@@ -169,6 +169,43 @@ function fileToBase64(file) {
   });
 }
 
+// Compress images before storing (PDFs pass through unchanged).
+// Scales to max 1800px on the longer side, re-encodes as JPEG q=0.85.
+// Typically shrinks 3-8MB phone photos down to 200-500KB without losing readability.
+function compressImageIfNeeded(file) {
+  return new Promise((resolve, reject) => {
+    if (!file.type.startsWith("image/") || file.type === "image/svg+xml") {
+      // Not an image (e.g. PDF) - use as-is
+      fileToBase64(file).then(resolve).catch(reject);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX_DIM = 1800;
+        let { width, height } = img;
+        if (width > MAX_DIM || height > MAX_DIM) {
+          if (width > height) { height = Math.round(height * (MAX_DIM / width)); width = MAX_DIM; }
+          else { width = Math.round(width * (MAX_DIM / height)); height = MAX_DIM; }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        const compressed = canvas.toDataURL("image/jpeg", 0.85);
+        // Safety: if compression somehow made it bigger, keep original
+        if (compressed.length < e.target.result.length) resolve(compressed);
+        else resolve(e.target.result);
+      };
+      img.onerror = () => resolve(e.target.result); // fallback to original on error
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 function base64ToBlob(dataUrl) {
   const [header, data] = dataUrl.split(",");
   const mime = header.match(/:(.*?);/)[1];
@@ -615,7 +652,7 @@ select.ifield option{background:var(--surface);color:var(--ink)}
 
 .upl-zone{margin:0 20px 16px;padding:18px;border-radius:6px;border:1.5px dashed rgba(255,255,255,.16);background:rgba(255,255,255,.02);display:flex;align-items:center;justify-content:center;transition:all .2s}
 .upl-item:hover .upl-zone{border-color:rgba(255,255,255,.3);background:rgba(255,255,255,.04)}
-.upl-item.done .upl-zone{display:none}
+.upl-item.done .upl-zone{border-color:var(--ok-b);background:rgba(63,182,139,.04)}
 
 .upl-stamp{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.15em;color:var(--ok);background:var(--ok-bg);border:1px solid var(--ok-b);padding:4px 10px;border-radius:4px;text-transform:uppercase;display:inline-flex;align-items:center;gap:6px;flex-shrink:0}
 
@@ -1003,17 +1040,18 @@ function MandantPage({mandantId}) {
   const allDone=doneSteps===totalSteps&&consent;
 
   async function handleUpload(docId,files){
+    setToast("Wird hochgeladen…");
     const fl=await Promise.all(Array.from(files).map(async f=>{
       const b64=await fileToBase64(f);
       const entry={name:f.name,date:new Date().toLocaleDateString("de-DE"),b64,type:f.type};
-      // Cache the actual file object for download
       const key=`${docId}_${f.name}`;
       fileCache.current[key]=f;
       return entry;
     }));
     const newU={...uploads,[docId]:[...(uploads[docId]??[]),...fl]};
     const nd={...data,uploads:newU};
-    setData(nd);await saveMandantData(mandantId,nd);
+    setData(nd);
+    await saveMandantData(mandantId,nd);
     setToast(`${fl.length} Datei(en) gespeichert`);
   }
 
@@ -1184,12 +1222,18 @@ function MandantPage({mandantId}) {
               {ok&&<span className="upl-stamp">✓ Eingereicht</span>}
             </div>
 
-            {!ok&&(
-              <div className="upl-zone">
+            {!noDoc&&!already&&(
+              <div className="upl-zone" style={{display:"flex",gap:8,flexWrap:"wrap",justifyContent:"center"}}>
                 <label className="btn btn-o btn-sm" style={{cursor:"pointer"}}>
-                  {files.length>0?"+ Weitere hochladen":dok.camera?"📷 Foto aufnehmen oder Datei hochladen":"📎 Datei hochladen"}
-                  <input type="file" className="file-in" multiple accept="image/*,application/pdf" capture={dok.camera?"environment":undefined} onChange={e=>handleUpload(dok.id,e.target.files)}/>
+                  {files.length>0?"+ Weitere Datei(en)":"📎 Datei(en) hochladen"}
+                  <input type="file" className="file-in" multiple accept="image/*,application/pdf" onChange={e=>handleUpload(dok.id,e.target.files)}/>
                 </label>
+                {dok.camera&&(
+                  <label className="btn btn-o btn-sm" style={{cursor:"pointer"}}>
+                    📷 Foto aufnehmen
+                    <input type="file" className="file-in" accept="image/*" capture="environment" onChange={e=>handleUpload(dok.id,e.target.files)}/>
+                  </label>
+                )}
               </div>
             )}
 
