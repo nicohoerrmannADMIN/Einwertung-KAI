@@ -24,27 +24,54 @@ async function sbFetch(path, method="GET", body=null, prefer="return=representat
   const t = await res.text(); return t ? JSON.parse(t) : null;
 }
 // Public fetch - always uses anon key, no auth token (for mandant-side reads)
-async function sbPublic(path, retries=4) {
+async function sbPublic(path, retries=6) {
   for (let i = 0; i < retries; i++) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(()=>controller.abort(), 8000);
+      const timeoutId = setTimeout(()=>controller.abort(), 15000);
       const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
         headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
-        signal: controller.signal
+        signal: controller.signal,
+        cache: "no-store"
       });
       clearTimeout(timeoutId);
       if (res.ok) {
         const t = await res.text();
         return t ? JSON.parse(t) : null;
       }
-      console.warn(`SB public attempt ${i+1} failed:`, res.status);
+      console.warn(`SB public attempt ${i+1}/${retries} failed: HTTP ${res.status}`);
     } catch(e) {
-      console.warn(`SB public attempt ${i+1} error:`, e.message);
+      console.warn(`SB public attempt ${i+1}/${retries} error:`, e.name === "AbortError" ? "timeout" : e.message);
     }
-    if (i < retries - 1) await new Promise(r => setTimeout(r, 1200 * (i + 1)));
+    if (i < retries - 1) await new Promise(r => setTimeout(r, 1500));
   }
-  console.error("SB public: all retries failed for", path);
+  console.error("SB public: all retries exhausted for", path);
+  return null;
+}
+async function sbPublicWrite(path, method, body, prefer="return=minimal", retries=4) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(()=>controller.abort(), 15000);
+      const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
+        method,
+        headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Content-Type": "application/json", "Prefer": prefer },
+        body: body ? JSON.stringify(body) : undefined,
+        signal: controller.signal,
+        cache: "no-store"
+      });
+      clearTimeout(timeoutId);
+      if (res.ok) {
+        const t = await res.text();
+        return t ? JSON.parse(t) : true;
+      }
+      console.warn(`SB write attempt ${i+1}/${retries} failed: HTTP ${res.status}`, await res.text());
+    } catch(e) {
+      console.warn(`SB write attempt ${i+1}/${retries} error:`, e.name === "AbortError" ? "timeout" : e.message);
+    }
+    if (i < retries - 1) await new Promise(r => setTimeout(r, 1500));
+  }
+  console.error("SB write: all retries exhausted for", path);
   return null;
 }
 async function supaLogin(email, password) {
@@ -77,8 +104,11 @@ async function loadMandantData(id) {
 async function saveMandantData(id, d) {
   try {
     const clean = JSON.parse(JSON.stringify(d, (k,v) => k === "_file" ? undefined : v));
-    await sbFetch("mandant_data", "POST", { mandant_id: id, data: clean }, "resolution=merge-duplicates,return=minimal");
-  } catch(e) { console.error(e); }
+    // Always use public (anon) key - mandant side has no auth token, must work for everyone
+    const ok = await sbPublicWrite("mandant_data", "POST", { mandant_id: id, data: clean }, "resolution=merge-duplicates,return=minimal");
+    if(!ok) console.error("saveMandantData failed permanently for", id);
+    return ok;
+  } catch(e) { console.error(e); return null; }
 }
 async function loadBerater() {
   try {
@@ -897,12 +927,12 @@ function MandantPage({mandantId}) {
     return ()=>{ cancelled = true; };
   },[mandantId, loadAttempt]);
 
-  // Auto-retry once more after 3s if still failed (covers cold-start without user action)
+  // Keep auto-retrying silently until data loads - no dead end, ever
   useEffect(()=>{
     if(!loadErr) return;
-    const t = setTimeout(()=>{ setLoadAttempt(a=>a+1); }, 3000);
+    const t = setTimeout(()=>{ setLoadAttempt(a=>a+1); }, 4000);
     return ()=>clearTimeout(t);
-  },[loadErr]);
+  },[loadErr, loadAttempt]);
 
   const storedPin = data?.pin;
 
