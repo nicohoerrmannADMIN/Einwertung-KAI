@@ -76,6 +76,20 @@ async function sbPublicWrite(path, method, body, prefer="return=minimal", retrie
   console.error("SB write: all retries exhausted for", path);
   return null;
 }
+// Keep-alive: pings Supabase periodically to prevent cold-start sleep
+let keepAliveInterval = null;
+function startKeepAlive() {
+  if (keepAliveInterval) return;
+  const ping = () => {
+    fetch(`${SB_URL}/rest/v1/berater?select=nr&limit=1`, {
+      headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
+      cache: "no-store"
+    }).catch(()=>{});
+  };
+  ping();
+  keepAliveInterval = setInterval(ping, 4 * 60 * 1000); // every 4 minutes
+}
+
 async function supaLogin(email, password) {
   const res = await fetch(`${SB_URL}/auth/v1/token?grant_type=password`, {
     method: "POST",
@@ -1712,6 +1726,7 @@ export default function App(){
     if(t){ setAccessToken(t); return true; }
     return false;
   });
+  useEffect(()=>{ startKeepAlive(); },[]);
   if(mandantId)return<MandantPage mandantId={mandantId}/>;
   if(!adminAuth)return<AdminLogin onLogin={()=>setAdminAuth(true)}/>;
   return<AdminPage onLogout={()=>{setAccessToken(null);sessionStorage.removeItem("ks2_token");setAdminAuth(false);}}/>;
