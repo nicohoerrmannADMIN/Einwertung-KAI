@@ -28,7 +28,9 @@ async function sbPublic(path, retries=6) {
   for (let i = 0; i < retries; i++) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(()=>controller.abort(), 15000);
+      // Fast first attempt, longer waits as fallback for real cold-starts
+      const timeoutMs = i === 0 ? 4000 : 10000;
+      const timeoutId = setTimeout(()=>controller.abort(), timeoutMs);
       const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
         headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
         signal: controller.signal,
@@ -43,7 +45,7 @@ async function sbPublic(path, retries=6) {
     } catch(e) {
       console.warn(`SB public attempt ${i+1}/${retries} error:`, e.name === "AbortError" ? "timeout" : e.message);
     }
-    if (i < retries - 1) await new Promise(r => setTimeout(r, 1500));
+    if (i < retries - 1) await new Promise(r => setTimeout(r, i === 0 ? 300 : 1200));
   }
   console.error("SB public: all retries exhausted for", path);
   return null;
@@ -1472,16 +1474,31 @@ function AdminPage({onLogout}){
     setToast(`CRM importiert ✓ – ${parsed.vorname} ${parsed.nachname}, Kd-Nr. ${parsed.kundennummer}`);
   }
 
-  async function handleCRMField(id,key,value){
-    const d=await loadMandantData(id);
-    const nd={...d,crmData:{...(d.crmData||{}),[key]:value}};
-    await saveMandantData(id,nd);setDetails(p=>({...p,[id]:nd}));
+  // Optimistic local update + debounced save (no lag while typing)
+  const saveTimers = useRef({});
+  function handleCRMField(id,key,value){
+    setDetails(p=>{
+      const d = p[id] || {};
+      return {...p,[id]:{...d,crmData:{...(d.crmData||{}),[key]:value}}};
+    });
+    debouncedSave(id);
   }
-
-  async function handleAdminField(id,key,value){
-    const d=await loadMandantData(id);
-    const nd={...d,adminData:{...(d.adminData||{}),[key]:value}};
-    await saveMandantData(id,nd);setDetails(p=>({...p,[id]:nd}));
+  function handleAdminField(id,key,value){
+    setDetails(p=>{
+      const d = p[id] || {};
+      return {...p,[id]:{...d,adminData:{...(d.adminData||{}),[key]:value}}};
+    });
+    debouncedSave(id);
+  }
+  function debouncedSave(id){
+    if(saveTimers.current[id]) clearTimeout(saveTimers.current[id]);
+    saveTimers.current[id] = setTimeout(()=>{
+      setDetails(p=>{
+        const d = p[id];
+        if(d) saveMandantData(id, d);
+        return p;
+      });
+    }, 600);
   }
 
   async function handleDownloadSA(id){
