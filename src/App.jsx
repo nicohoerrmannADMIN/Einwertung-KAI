@@ -24,12 +24,24 @@ async function sbFetch(path, method="GET", body=null, prefer="return=representat
   const t = await res.text(); return t ? JSON.parse(t) : null;
 }
 // Public fetch - always uses anon key, no auth token (for mandant-side reads)
-async function sbPublic(path) {
-  const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
-    headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` }
-  });
-  if (!res.ok) { console.error("SB public:", res.status, await res.text()); return null; }
-  const t = await res.text(); return t ? JSON.parse(t) : null;
+async function sbPublic(path, retries=3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
+        headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` }
+      });
+      if (res.ok) {
+        const t = await res.text();
+        return t ? JSON.parse(t) : null;
+      }
+      console.warn(`SB public attempt ${i+1} failed:`, res.status);
+    } catch(e) {
+      console.warn(`SB public attempt ${i+1} error:`, e.message);
+    }
+    if (i < retries - 1) await new Promise(r => setTimeout(r, 800 * (i + 1)));
+  }
+  console.error("SB public: all retries failed for", path);
+  return null;
 }
 async function supaLogin(email, password) {
   const res = await fetch(`${SB_URL}/auth/v1/token?grant_type=password`, {
@@ -442,7 +454,6 @@ async function generateSAPDF(sa, adminData, crmData, fullName) {
 
 // ── CSS ──────────────────────────────────────────────────────────
 const CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
 :root{
   --bg:#0B0E14;
   --surface:#141A24;
