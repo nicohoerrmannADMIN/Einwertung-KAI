@@ -7,7 +7,7 @@ const EMAILJS_PUBLIC = "KenDwBUdjTdLSbgM-";
 
 // ── Supabase Storage ───────────────────────────────────────────
 const SB_URL = "https://jtlblbgxzbxjplamdpiu.supabase.co";
-const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp0bGJsYmd4emJ4anBsYW1kcGl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwMzgxNDIsImV4cCI6MjA5NjYxNDE0Mn0.OW11imBD9D8aD6T-nJzLOaCOoXSJY3AWK7uzHj9ft7s";
+const SB_KEY = "sb_publishable_XZaNy8RC0iATbuq2IVJ0Qg_9qNDsMBd";
 
 let accessToken = null;
 function setAccessToken(t){ accessToken = t; }
@@ -893,7 +893,7 @@ function SAWizard({crmData, adminData, existing, onSave, onClose}) {
     {key:"verm_sonstiges",label:"Sonstiges Vermögen",placeholder:"0"},
   ],sumKeys:["verm_immobilien","verm_bank","verm_wertpapiere","verm_sonstiges"]});
 
-  steps.push({id:"einsetzbar",type:"text",q:"Wie viel Kapital könntest du einsetzen?",hint:"Einsetzbares Kapital = der Betrag den du bereit bist für den Immobilienkauf zu verwenden.",key:"einsetzbar",placeholder:"30.000"});
+  steps.push({id:"einsetzbar",type:"text",q:"Wie viel Kapital könntest du einsetzen?",hint:"Einsetzbares Kapital = der Betrag den du bereit bist für den Immobilienkauf zu verwenden.",key:"einsetzbar",placeholder:"30.000",inputMode:"decimal"});
 
   // Verbindlichkeiten
   steps.push({id:"verbindlichkeiten",type:"sumFields",q:"Bestehende Verbindlichkeiten",hint:"Aktuelle Restschulden in €",fields:[
@@ -947,7 +947,7 @@ function SAWizard({crmData, adminData, existing, onSave, onClose}) {
           <div>
             <div className="sa-q">{cur.q}</div>
             {cur.hint&&<div className="sa-hint">{cur.hint}</div>}
-            <input className="sa-num" value={vals[cur.key]||""} onChange={e=>set(cur.key,e.target.value)} placeholder={cur.placeholder||""} autoFocus inputMode="decimal"/>
+            <input className="sa-num" value={vals[cur.key]||""} onChange={e=>set(cur.key,e.target.value)} placeholder={cur.placeholder||""} autoFocus inputMode={cur.inputMode||"text"}/>
           </div>
         )}
         {cur.type==="multi"&&(
