@@ -1014,6 +1014,7 @@ const DOCS = [
   {id:"lohn1",label:"Gehaltsnachweis / Lohnzettel",sublabel:"Letzter vollständiger Monat",hint:"Foto direkt mit der Kamera möglich.",required:true,camera:true,canHaveAlready:true},
   {id:"lohn2",label:"Gehaltsnachweis / Lohnzettel",sublabel:"Vorletzter vollständiger Monat",hint:null,required:true,camera:true,canHaveAlready:true},
   {id:"lohn3",label:"Gehaltsnachweis / Lohnzettel",sublabel:"Drittletzter vollständiger Monat",hint:null,required:true,camera:true,canHaveAlready:true},
+  {id:"lohnsteuerbescheinigung",label:"Lohnsteuerbescheinigung",sublabel:"Vom Arbeitgeber, meist Anfang des Jahres",hint:"Das Dokument mit der Jahresübersicht aller Monate und dem Gesamteinkommen (nicht der Steuerbescheid vom Finanzamt).",required:true,camera:true,canHaveAlready:true},
 ];
 
 // ── Mandant Page ─────────────────────────────────────────────────
