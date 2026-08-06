@@ -14,6 +14,54 @@ function setAccessToken(t){ accessToken = t; }
 function authHeaders(extra={}) {
   return { "apikey": SB_KEY, "Authorization": `Bearer ${accessToken || SB_KEY}`, ...extra };
 }
+
+// ── Mandanten-Zugang ───────────────────────────────────────────
+// Wird gesetzt, sobald die PIN korrekt eingegeben wurde. Alle Zugriffe
+// der Mandantenseite laufen danach gegen ID + PIN — die Datenbank prueft
+// serverseitig, ob der Zugriff erlaubt ist.
+let mandantAuth = null;
+function setMandantAuth(a){ mandantAuth = a; }
+
+// Holt einen kurzlebigen Einmal-Link vom abgesicherten Datei-Dienst.
+const FN_FILE_URL = `${SB_URL}/functions/v1/mandant-file`;
+async function mandantFileLink(action, path) {
+  if (!mandantAuth) return null;
+  try {
+    const res = await fetch(FN_FILE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
+      body: JSON.stringify({ mandant_id: mandantAuth.id, pin: mandantAuth.pin, action, path })
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch(e) { return null; }
+}
+
+// Ruft eine abgesicherte Datenbankfunktion auf.
+// Rueckgabe `undefined` = Funktion noch nicht angelegt (Uebergangsphase).
+async function mandantRpc(fn, body, retries=4) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(()=>controller.abort(), i === 0 ? 6000 : 12000);
+      const res = await fetch(`${SB_URL}/rest/v1/rpc/${fn}`, {
+        method: "POST",
+        headers: { "apikey": SB_KEY, "Authorization": `Bearer ${accessToken || SB_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+        cache: "no-store"
+      });
+      clearTimeout(timeoutId);
+      if (res.status === 404) return undefined;
+      if (res.ok) { const t = await res.text(); return t ? JSON.parse(t) : null; }
+      console.warn(`RPC ${fn} attempt ${i+1}/${retries}: HTTP ${res.status}`);
+    } catch(e) {
+      console.warn(`RPC ${fn} attempt ${i+1}/${retries} error:`, e.name === "AbortError" ? "timeout" : e.message);
+    }
+    if (i < retries - 1) await new Promise(r => setTimeout(r, i === 0 ? 400 : 1200));
+  }
+  return null;
+}
 async function sbFetch(path, method="GET", body=null, prefer="return=representation") {
   const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
     method,
@@ -62,12 +110,35 @@ async function sbStorageUpload(path, file, retries=4) {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(()=>controller.abort(), 30000);
-      const res = await fetch(`${SB_URL}/storage/v1/object/${STORAGE_BUCKET}/${path}`, {
-        method: "POST",
-        headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Content-Type": file.type || "application/octet-stream", "x-upsert": "true" },
-        body: file,
-        signal: controller.signal
-      });
+      let res;
+      if (accessToken) {
+        // Berater ist eingeloggt -> direkter, authentifizierter Upload
+        res = await fetch(`${SB_URL}/storage/v1/object/${STORAGE_BUCKET}/${path}`, {
+          method: "POST",
+          headers: { "apikey": SB_KEY, "Authorization": `Bearer ${accessToken}`, "Content-Type": file.type || "application/octet-stream", "x-upsert": "true" },
+          body: file,
+          signal: controller.signal
+        });
+      } else {
+        const link = await mandantFileLink("upload", path);
+        if (link?.signedUrl) {
+          // Mandant -> Einmal-Link vom Datei-Dienst
+          res = await fetch(link.signedUrl, {
+            method: "PUT",
+            headers: { "Content-Type": file.type || "application/octet-stream", "x-upsert": "true" },
+            body: file,
+            signal: controller.signal
+          });
+        } else {
+          // Uebergang: solange der Datei-Dienst noch nicht deployed ist
+          res = await fetch(`${SB_URL}/storage/v1/object/${STORAGE_BUCKET}/${path}`, {
+            method: "POST",
+            headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Content-Type": file.type || "application/octet-stream", "x-upsert": "true" },
+            body: file,
+            signal: controller.signal
+          });
+        }
+      }
       clearTimeout(timeoutId);
       if (res.ok) return true;
       console.warn(`Storage upload attempt ${i+1}/${retries} failed: HTTP ${res.status}`, await res.text());
@@ -87,9 +158,13 @@ function sbStorageUrl(path) {
 async function sbStorageDelete(path, retries=3) {
   for (let i = 0; i < retries; i++) {
     try {
+      if (!accessToken && mandantAuth) {
+        const r = await mandantFileLink("delete", path);
+        if (r?.ok) return true;
+      }
       const res = await fetch(`${SB_URL}/storage/v1/object/${STORAGE_BUCKET}/${path}`, {
         method: "DELETE",
-        headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` }
+        headers: { "apikey": SB_KEY, "Authorization": `Bearer ${accessToken || SB_KEY}` }
       });
       if (res.ok) return true;
     } catch(e) {}
@@ -103,7 +178,16 @@ async function sbStorageFetchBlob(path, retries=4) {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(()=>controller.abort(), 20000);
-      const res = await fetch(sbStorageUrl(path), { signal: controller.signal, cache: "no-store" });
+      let res;
+      if (accessToken) {
+        res = await fetch(`${SB_URL}/storage/v1/object/${STORAGE_BUCKET}/${path}`, {
+          headers: { "apikey": SB_KEY, "Authorization": `Bearer ${accessToken}` },
+          signal: controller.signal, cache: "no-store"
+        });
+      } else {
+        const link = await mandantFileLink("download", path);
+        res = await fetch(link?.signedUrl || sbStorageUrl(path), { signal: controller.signal, cache: "no-store" });
+      }
       clearTimeout(timeoutId);
       if (res.ok) return await res.blob();
     } catch(e) {
@@ -176,15 +260,53 @@ async function loadMandanten() {
 async function saveMandanten(d) { /* handled via createMandant */ }
 async function loadMandantData(id) {
   try {
-    // Use public (anon) key - mandant page has no auth token
+    if (accessToken) {
+      const rows = await sbFetch(`mandant_data?mandant_id=eq.${id}&select=data`);
+      return (rows && rows.length > 0) ? rows[0].data : null;
+    }
     const rows = await sbPublic(`mandant_data?mandant_id=eq.${id}&select=data`);
     return (rows && rows.length > 0) ? rows[0].data : null;
   } catch(e) { return null; }
 }
+
+// Mandanten-Login: laedt die Daten NUR, wenn die PIN stimmt.
+// Die Pruefung passiert serverseitig — der Browser bekommt bei falscher
+// PIN nichts zu sehen. Rueckgabe null = PIN falsch oder zu viele Versuche.
+async function mandantLogin(id, pin) {
+  const viaRpc = await mandantRpc("mandant_get", { p_id: id, p_pin: String(pin) });
+  if (viaRpc !== undefined) return viaRpc;
+  // Uebergang: Datenbankfunktion noch nicht angelegt -> alter Weg
+  const legacy = await loadMandantData(id);
+  if (legacy && String(legacy.pin) === String(pin)) return legacy;
+  if (!legacy) {
+    const rows = await sbPublic(`mandanten?id=eq.${id}&select=vorname,nachname,pin,berater_nr`);
+    if (rows && rows.length > 0 && String(rows[0].pin) === String(pin)) {
+      return { ...rows[0], uploads:{}, selbstauskunft:null, crmData:null, adminData:{} };
+    }
+  }
+  return null;
+}
+
 async function saveMandantData(id, d) {
   try {
     const clean = JSON.parse(JSON.stringify(d, (k,v) => k === "_file" ? undefined : v));
-    // Always use public (anon) key - mandant side has no auth token, must work for everyone
+
+    // Mandant: ueber die abgesicherte Funktion (PIN wird serverseitig geprueft)
+    if (mandantAuth && mandantAuth.id === id) {
+      const ok = await mandantRpc("mandant_save", { p_id: id, p_pin: String(mandantAuth.pin), p_data: clean });
+      if (ok !== undefined) {
+        if (!ok) console.error("saveMandantData abgelehnt für", id);
+        return ok;
+      }
+    }
+
+    // Berater: mit eigenem Login-Token
+    if (accessToken) {
+      const ok = await sbFetch("mandant_data", "POST", { mandant_id: id, data: clean }, "resolution=merge-duplicates,return=minimal");
+      return ok !== null;
+    }
+
+    // Uebergang, solange die Datenbankfunktionen noch nicht angelegt sind
     const ok = await sbPublicWrite("mandant_data", "POST", { mandant_id: id, data: clean }, "resolution=merge-duplicates,return=minimal");
     if(!ok) console.error("saveMandantData failed permanently for", id);
     return ok;
@@ -1033,34 +1155,33 @@ function MandantPage({mandantId}) {
 
   const [loadErr,setLoadErr]=useState(false);
   const [loadAttempt,setLoadAttempt]=useState(0);
+  const [checking,setChecking]=useState(false);
+
+  // Ein eingeloggter Berater darf die Mandantenansicht ohne PIN oeffnen.
+  const isBerater = (()=>{ try { return !!sessionStorage.getItem("ks2_token"); } catch(e){ return false; } })();
 
   useEffect(()=>{
+    if(!isBerater) return;           // Mandant: Daten werden erst nach PIN geladen
     let cancelled = false;
     setLoadErr(false);
-    // Load full data from mandant_data
-    loadMandantData(mandantId).then(async d=>{
-      if(cancelled) return;
-      if(d && (d.vorname || d.nachname)){
-        setData(d);
-      } else {
-        // Fallback: try to at least get name+pin from mandanten table
-        try {
-          const rows = await sbPublic(`mandanten?id=eq.${mandantId}&select=vorname,nachname,pin,berater_nr`);
-          if(rows && rows.length > 0 && !cancelled){
-            const base = rows[0];
-            setData({
-              vorname: base.vorname, nachname: base.nachname,
-              pin: base.pin, berater_nr: base.berater_nr,
-              uploads:{}, selbstauskunft:null, crmData:null, adminData:{}
-            });
-          } else if(!cancelled) {
-            setLoadErr(true);
+    (async ()=>{
+      try {
+        let d = await loadMandantData(mandantId);
+        if(!d || !(d.vorname || d.nachname)){
+          const rows = await sbFetch(`mandanten?id=eq.${mandantId}&select=vorname,nachname,pin,berater_nr`);
+          if(rows && rows.length > 0){
+            const b = rows[0];
+            d = { vorname:b.vorname, nachname:b.nachname, pin:b.pin, berater_nr:b.berater_nr,
+                  uploads:{}, selbstauskunft:null, crmData:null, adminData:{} };
           }
-        } catch(e){ if(!cancelled) setLoadErr(true); }
-      }
-    });
+        }
+        if(cancelled) return;
+        if(d){ setMandantAuth({ id:mandantId, pin:d.pin }); setData(d); setPinOk(true); }
+        else setLoadErr(true);
+      } catch(e){ if(!cancelled) setLoadErr(true); }
+    })();
     return ()=>{ cancelled = true; };
-  },[mandantId, loadAttempt]);
+  },[mandantId, loadAttempt, isBerater]);
 
   // Keep auto-retrying silently until data loads - no dead end, ever
   useEffect(()=>{
@@ -1069,14 +1190,23 @@ function MandantPage({mandantId}) {
     return ()=>clearTimeout(t);
   },[loadErr, loadAttempt]);
 
-  const storedPin = data?.pin;
-
-  function checkPin(){
-    if(String(pinInput).trim()===String(storedPin)){setPinOk(true);}
-    else{setPinErr(true);setTimeout(()=>setPinErr(false),2000);}
+  // Prueft die PIN serverseitig und laedt die Daten nur bei Erfolg.
+  async function checkPin(){
+    const pin = String(pinInput).trim();
+    if(!pin || checking) return;
+    setChecking(true);
+    const d = await mandantLogin(mandantId, pin);
+    setChecking(false);
+    if(d){
+      setMandantAuth({ id:mandantId, pin });
+      setData(d);
+      setPinOk(true);
+    } else {
+      setPinErr(true); setTimeout(()=>setPinErr(false),2500);
+    }
   }
 
-  if(data && storedPin && !pinOk){
+  if(!pinOk && !isBerater){
     return(
       <div className="app"><style>{CSS}</style>
         <div style={{maxWidth:320,margin:"80px auto",padding:"0 20px"}}>
@@ -1085,9 +1215,12 @@ function MandantPage({mandantId}) {
           <div style={{fontSize:12,color:"var(--muted)",marginBottom:16}}>Bitte gib den 5-stelligen PIN ein, den du von deinem Berater erhalten hast.</div>
           <input className="ifield" type="number" placeholder="12345" value={pinInput}
             onChange={e=>setPinInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&checkPin()}
+            disabled={checking}
             style={{width:"100%",marginBottom:8,fontSize:20,textAlign:"center",letterSpacing:4,borderColor:pinErr?"var(--accent)":undefined}}/>
-          {pinErr&&<div style={{color:"var(--accent)",fontSize:11,marginBottom:8}}>Falscher PIN</div>}
-          <button className="btn" style={{width:"100%"}} onClick={checkPin}>Weiter →</button>
+          {pinErr&&<div style={{color:"var(--accent)",fontSize:11,marginBottom:8}}>PIN stimmt nicht. Nach mehreren Fehlversuchen ist der Zugang kurz gesperrt.</div>}
+          <button className="btn" style={{width:"100%"}} onClick={checkPin} disabled={checking}>
+            {checking ? "Wird geprüft…" : "Weiter →"}
+          </button>
         </div>
       </div>
     );
