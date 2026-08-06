@@ -126,34 +126,76 @@ grant execute on function public.mandant_save(text, text, jsonb) to anon, authen
 
 
 -- ============================================================================
---  SCHRITT 3 — Tabellen abriegeln
+--  SCHRITT 3 — Tabellen abriegeln   [angewendet am 06.08.2026]
 --
---  ERST AUSFUEHREN, wenn der neue Code live ist und Schritt 1 + der
---  Datei-Dienst (Edge Function) funktionieren! Vorher bricht die
---  Mandantenseite.
+--  ERST AUSFUEHREN, wenn der neue Code live ist und Schritt 1 funktioniert!
+--  Vorher bricht die Mandantenseite.
 --
---  Danach gilt: anon (= jeder Besucher) kommt an KEINE Tabelle mehr direkt
---  ran. Berater kommen ueber ihren Login (authenticated) weiterhin an alles.
+--  Danach gilt: anon (= jeder Besucher) kommt an KEINE Mandantendaten mehr
+--  direkt ran. Berater kommen ueber ihren Login (authenticated) an alles.
+--
+--  WICHTIG: Der DO-Block raeumt ALLE bestehenden Regeln auf diesen zwei
+--  Tabellen weg. Beim ersten Anlauf lagen dort noch alte
+--  "fuer alle erlauben"-Regeln aus der Ersteinrichtung — die haben das
+--  Einschalten des Schutzes wirkungslos gemacht.
+--
+--  Die Tabelle `berater` wird BEWUSST NICHT abgeriegelt: Das Tool
+--  "Meine-Unterlagen" liest die Beraterliste ohne Login. Dort stehen nur
+--  interne Mitarbeiternamen, keine Kundendaten.
 -- ============================================================================
 
--- alter table public.mandanten    enable row level security;
--- alter table public.mandant_data enable row level security;
--- alter table public.berater      enable row level security;
---
--- create policy "berater voll mandanten"    on public.mandanten
---   for all to authenticated using (true) with check (true);
---
--- create policy "berater voll mandant_data" on public.mandant_data
---   for all to authenticated using (true) with check (true);
---
--- create policy "berater voll berater"      on public.berater
---   for all to authenticated using (true) with check (true);
+do $$
+declare p record;
+begin
+  for p in select policyname, tablename from pg_policies
+            where schemaname='public' and tablename in ('mandanten','mandant_data')
+  loop
+    execute format('drop policy %I on public.%I', p.policyname, p.tablename);
+  end loop;
+end $$;
+
+alter table public.mandanten    enable row level security;
+alter table public.mandant_data enable row level security;
+
+create policy berater_voll_mandanten on public.mandanten
+  for all to authenticated using (true) with check (true);
+
+create policy berater_voll_mandant_data on public.mandant_data
+  for all to authenticated using (true) with check (true);
 
 
 -- ============================================================================
---  KONTROLLE — nach Schritt 3 ausfuehren, muss ueberall rowsecurity = true zeigen
+--  SCHRITT 4 — Datei-Speicher abriegeln   [angewendet am 06.08.2026]
+--  Setzt voraus, dass die Edge Function `mandant-file` deployed ist,
+--  sonst koennen Mandanten nicht mehr hoch-/herunterladen.
 -- ============================================================================
--- select tablename, rowsecurity
---   from pg_tables
---  where schemaname = 'public'
---    and tablename in ('mandanten','mandant_data','berater','mandant_login_attempts');
+
+do $$
+declare p record;
+begin
+  for p in
+    select policyname from pg_policies
+     where schemaname='storage' and tablename='objects'
+       and (coalesce(qual,'') like '%mandant-files%'
+         or coalesce(with_check,'') like '%mandant-files%')
+  loop
+    execute format('drop policy %I on storage.objects', p.policyname);
+  end loop;
+end $$;
+
+drop policy if exists mandant_files_berater on storage.objects;
+create policy mandant_files_berater on storage.objects
+  for all to authenticated
+  using (bucket_id = 'mandant-files')
+  with check (bucket_id = 'mandant-files');
+
+update storage.buckets set public = false where id = 'mandant-files';
+
+
+-- ============================================================================
+--  KONTROLLE — muss true / true / false zeigen
+-- ============================================================================
+-- select
+--   (select rowsecurity from pg_tables where schemaname='public' and tablename='mandanten')    as mandanten_geschuetzt,
+--   (select rowsecurity from pg_tables where schemaname='public' and tablename='mandant_data') as daten_geschuetzt,
+--   (select public from storage.buckets where id='mandant-files')                              as bucket_oeffentlich;

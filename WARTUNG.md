@@ -9,17 +9,36 @@ Wenn etwas kaputt ist: zuerst `pruefung.bat` doppelklicken (siehe unten).
 |---|---|---|
 | Code | GitHub `nicohoerrmannADMIN/Einwertung-KAI` | Wird bei jedem Push automatisch neu deployed |
 | Datenbank | Supabase-Projekt `jtlblbgxzbxjplamdpiu` | Tabelle `mandant_data` |
-| Datei-Speicher | Supabase → Storage | Bucket `mandant-files`, **Public**, mit einer Policy (SELECT+INSERT+UPDATE+DELETE für alle Rollen) |
+| Datei-Speicher | Supabase → Storage | Bucket `mandant-files`, **privat**, Policy nur für `authenticated` |
+| Datei-Zugang Mandant | Supabase → Edge Functions | Funktion `mandant-file` (Verify JWT AUS) — gibt nach PIN-Prüfung Einmal-Links aus |
+| Zugriffsschutz | Supabase → Datenbank | RLS an auf `mandanten` + `mandant_data`; Mandantenzugriff nur über `mandant_get` / `mandant_save` |
+
+Wie die Absicherung funktioniert und was sie abwehrt: **`SICHERHEIT.md`**
 
 ## Supabase-Einstellungen (falls sie je neu angelegt werden müssen)
 
 1. Dashboard: https://supabase.com/dashboard/project/jtlblbgxzbxjplamdpiu
-2. Storage → New bucket → Name exakt `mandant-files` → „Public bucket" AN
-3. Storage → Policies → beim Bucket `mandant-files` → New policy → „For full customization"
-   → alle vier Operationen (SELECT, INSERT, UPDATE, DELETE) ankreuzen → speichern
+2. Storage → New bucket → Name exakt `mandant-files` → „Public bucket" **AUS**
+3. Storage-Policy im SQL Editor anlegen:
+
+```sql
+create policy mandant_files_berater on storage.objects
+  for all to authenticated
+  using (bucket_id = 'mandant-files')
+  with check (bucket_id = 'mandant-files');
+```
+
+4. Edge Function `mandant-file` deployen (Code: `supabase/functions/mandant-file/`),
+   danach für diese Funktion **„Verify JWT" ausschalten**.
+5. Datenbankschutz + Zugriffsfunktionen: `SICHERHEIT.sql` ausführen.
+
+> ⚠️ **Bucket niemals auf „Public" stellen und keine Policy für `anon` anlegen.**
+> Dann wären sämtliche Mandantendokumente wieder für jeden im Internet abrufbar.
+> Mandanten brauchen keinen direkten Zugriff — sie laden über die Edge Function
+> hoch und herunter, die ihnen nach PIN-Prüfung kurzlebige Einmal-Links ausstellt.
 
 Ohne Bucket: Fehler „Bucket not found" → Mandanten sehen „Hochladen fehlgeschlagen".
-Ohne Policy: Fehler „violates row-level security policy" → gleiche Meldung beim Mandanten.
+Ohne Edge Function: Upload/Download beim Mandanten schlägt fehl (Berater-Ansicht läuft weiter).
 
 ## Regeln, damit nichts kaputt geht
 

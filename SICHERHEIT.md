@@ -23,7 +23,35 @@ geladen und nur im Browser verglichen. Wer die Entwicklertools öffnete, sah all
 
 ---
 
-## Reihenfolge einhalten!
+## Status: umgesetzt und geprüft am 06.08.2026
+
+Alle vier Schritte sind erledigt. Von außen nachgemessen — jeweils **ohne** Login und **ohne** PIN:
+
+| Prüfung | Ergebnis |
+|---|---|
+| Mandantenliste mit Namen + PINs abrufen | gesperrt (`[]`) |
+| Formulardaten abrufen | gesperrt (`[]`) |
+| Datensätze anlegen/ändern | gesperrt |
+| Dateispeicher auflisten | gesperrt (`[]`) |
+| Dokument über öffentliche Adresse laden | gesperrt (HTTP 400) |
+| Dokument mit öffentlichem Schlüssel laden | gesperrt (HTTP 400) |
+
+Und mit gültigem Zugang:
+
+| Prüfung | Ergebnis |
+|---|---|
+| Mandant meldet sich mit richtiger PIN an | lädt seine Daten |
+| Mandant mit falscher PIN | abgewiesen |
+| Mandant lädt Datei hoch und wieder herunter | funktioniert |
+| Mandant A will an Datei von Mandant B — mit **eigener gültiger PIN** | abgewiesen (HTTP 403) |
+| Pfad-Trick mit `..` | abgewiesen (HTTP 403) |
+| Berater-Ansicht und Beraterliste | unverändert nutzbar |
+
+Getestet wurde mit einem Wegwerf-Mandanten, nicht mit echten Kundendaten.
+
+---
+
+## Reihenfolge einhalten! *(nur relevant, falls alles neu aufgebaut werden muss)*
 
 Der neue Code ist bereits live und läuft im **Übergangsmodus**: Er versucht
 zuerst den sicheren Weg und fällt auf den alten zurück, solange die
