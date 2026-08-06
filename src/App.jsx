@@ -1156,6 +1156,7 @@ function MandantPage({mandantId}) {
   const [loadErr,setLoadErr]=useState(false);
   const [loadAttempt,setLoadAttempt]=useState(0);
   const [checking,setChecking]=useState(false);
+  const [beraterLoadFailed,setBeraterLoadFailed]=useState(false);
 
   // Ein eingeloggter Berater darf die Mandantenansicht ohne PIN oeffnen.
   const isBerater = (()=>{ try { return !!sessionStorage.getItem("ks2_token"); } catch(e){ return false; } })();
@@ -1177,8 +1178,9 @@ function MandantPage({mandantId}) {
         }
         if(cancelled) return;
         if(d){ setMandantAuth({ id:mandantId, pin:d.pin }); setData(d); setPinOk(true); }
-        else setLoadErr(true);
-      } catch(e){ if(!cancelled) setLoadErr(true); }
+        // Kein Zugriff (Token abgelaufen oder ungueltig) -> normale PIN-Abfrage zeigen
+        else setBeraterLoadFailed(true);
+      } catch(e){ if(!cancelled) setBeraterLoadFailed(true); }
     })();
     return ()=>{ cancelled = true; };
   },[mandantId, loadAttempt, isBerater]);
@@ -1206,7 +1208,7 @@ function MandantPage({mandantId}) {
     }
   }
 
-  if(!pinOk && !isBerater){
+  if(!pinOk && (!isBerater || beraterLoadFailed)){
     return(
       <div className="app"><style>{CSS}</style>
         <div style={{maxWidth:320,margin:"80px auto",padding:"0 20px"}}>
