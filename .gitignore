@@ -1,2 +1,5 @@
 node_modules/
 dist/
+
+# Supabase CLI temp
+supabase/.temp/
