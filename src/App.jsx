@@ -1192,6 +1192,23 @@ function MandantPage({mandantId}) {
     return ()=>clearTimeout(t);
   },[loadErr, loadAttempt]);
 
+  // Aus „Mein Bereich“ der Monatsplanung: PIN im Link-Anker (#pin=…) — einmal pruefen und aus der Adresse nehmen
+  useEffect(()=>{
+    const m = /pin=(\d{4,8})/.exec(window.location.hash || "");
+    if(!m || isBerater) return;
+    try { window.history.replaceState(null, "", window.location.pathname + window.location.search); } catch(e){}
+    let cancelled = false;
+    (async ()=>{
+      setChecking(true);
+      const d = await mandantLogin(mandantId, m[1]);
+      if(cancelled) return;
+      setChecking(false);
+      if(d){ setMandantAuth({ id:mandantId, pin:m[1] }); setData(d); setPinOk(true); }
+      else setPinInput(m[1]);
+    })();
+    return ()=>{ cancelled = true; };
+  },[mandantId]);
+
   // Prueft die PIN serverseitig und laedt die Daten nur bei Erfolg.
   async function checkPin(){
     const pin = String(pinInput).trim();
